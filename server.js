@@ -1,0 +1,604 @@
+require('dotenv').config();
+const express = require('express');
+const cors    = require('cors');
+const fetch   = require('node-fetch');
+const { Pool } = require('pg');
+
+const app  = express();
+const PORT = process.env.PORT || 3000;
+
+// ── CORS — allow GitHub Pages origin ──────────────────────────────────────────
+const allowedOrigins = [
+  'https://mmalikmo07.github.io',
+  'http://localhost:3000',
+  'http://127.0.0.1:5500',   // Live Server
+  'null'                      // file:// local testing
+];
+
+app.use(cors({
+  origin: (origin, cb) => {
+    if(!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    cb(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization']
+}));
+
+app.use(express.json({ limit: '2mb' }));
+
+// ── POSTGRES ───────────────────────────────────────────────────────────────────
+const db = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+});
+
+// Init tables on startup
+async function initDB(){
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS ideas (
+        id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        category TEXT,
+        priority TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS gym_sessions (
+        id SERIAL PRIMARY KEY,
+        day_num INTEGER,
+        day_title TEXT,
+        weights JSONB,
+        logged_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS gym_weights (
+        id SERIAL PRIMARY KEY,
+        day_num INTEGER,
+        exercise_idx INTEGER,
+        weight TEXT,
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(day_num, exercise_idx)
+      );
+
+      CREATE TABLE IF NOT EXISTS modules (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        credits INTEGER DEFAULT 10,
+        year INTEGER DEFAULT 1,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS assessments (
+        id SERIAL PRIMARY KEY,
+        module_id INTEGER REFERENCES modules(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        weight NUMERIC,
+        score NUMERIC,
+        max_score NUMERIC DEFAULT 100,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS quran_log (
+        id SERIAL PRIMARY KEY,
+        date DATE DEFAULT CURRENT_DATE,
+        sabaq INTEGER DEFAULT 0,
+        sabqi INTEGER DEFAULT 0,
+        manzil INTEGER DEFAULT 0,
+        tilawah INTEGER DEFAULT 0,
+        notes TEXT,
+        UNIQUE(date)
+      );
+
+      CREATE TABLE IF NOT EXISTS habits (
+        id SERIAL PRIMARY KEY,
+        week_start DATE,
+        habit_idx INTEGER,
+        day_idx INTEGER,
+        done BOOLEAN DEFAULT false,
+        UNIQUE(week_start, habit_idx, day_idx)
+      );
+
+      CREATE TABLE IF NOT EXISTS projects (
+        id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        category TEXT,
+        status TEXT DEFAULT 'idea',
+        progress INTEGER DEFAULT 0,
+        mindmap_text TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    console.log('✓ Database tables ready');
+  } catch(e) {
+    console.error('DB init error:', e.message);
+  }
+}
+
+// ── HEALTH CHECK ───────────────────────────────────────────────────────────────
+app.get('/', (req, res) => res.json({
+  status: 'MALIK OS Backend Online',
+  version: '1.0.0',
+  timestamp: new Date().toISOString()
+}));
+
+app.get('/health', (req, res) => res.json({ ok: true }));
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AI ROUTES — all Claude calls happen server-side, zero CORS issues
+// ═══════════════════════════════════════════════════════════════════════════════
+async function callClaude(prompt, maxTokens = 600, systemPrompt = null) {
+  const messages = [{ role: 'user', content: prompt }];
+  const body = {
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: maxTokens,
+    messages
+  };
+  if(systemPrompt) body.system = systemPrompt;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify(body)
+  });
+
+  if(!res.ok) {
+    const err = await res.text();
+    throw new Error(`Anthropic API ${res.status}: ${err}`);
+  }
+
+  const data = await res.json();
+  return data.content[0].text;
+}
+
+const MALIK_SYSTEM = `You are Malik's personal AI assistant built into his OS. 
+Malik is a 1st year EEE (Electrical & Electronic Engineering) student at Swansea University.
+His OS has 8 departments: Project Lab, Curiosity Lab (AI/ML pathway), University Core, 
+Quran memorisation (Hifz), Physical Edge (4-day gym split), Sport (boxing/table tennis), 
+Side Hustle Lab, and Habits. Be concise, practical, and direct. Never be preachy.`;
+
+// General AI chat
+app.post('/api/ai/ask', async (req, res) => {
+  try {
+    const { prompt, maxTokens = 600 } = req.body;
+    if(!prompt) return res.status(400).json({ error: 'prompt required' });
+    const text = await callClaude(prompt, maxTokens, MALIK_SYSTEM);
+    res.json({ text });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Expand project idea
+app.post('/api/ai/expand-idea', async (req, res) => {
+  try {
+    const { title, description } = req.body;
+    const prompt =
+      `Malik's project idea: "${title}". ${description ? 'Description: ' + description : ''}\n\n` +
+      `Expand with:\n1) Why it's great for a 1st year EEE student\n` +
+      `2) Exact components/tech stack needed with approximate UK prices\n` +
+      `3) 5-step build plan\n4) Skills he'll gain\n5) How to make it portfolio-worthy\n\n` +
+      `Be specific and motivating. Format with clear sections.`;
+    const text = await callClaude(prompt, 800, MALIK_SYSTEM);
+    res.json({ text });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Study explainer
+app.post('/api/ai/explain', async (req, res) => {
+  try {
+    const { concept, level } = req.body;
+    const levelMap = {
+      'ELI5':      "explain like he is 12 using very simple everyday analogies",
+      'Student':   "explain at first-year university level with mathematical intuition",
+      'Deep Dive': "give a rigorous deep technical explanation with key equations and derivations"
+    };
+    const prompt =
+      `Please ${levelMap[level] || levelMap['Student']}: ${concept}. ` +
+      `Connect it to electrical engineering applications wherever possible. Use clear structure.`;
+    const text = await callClaude(prompt, 900, MALIK_SYSTEM);
+    res.json({ text });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Notes autocomplete
+app.post('/api/ai/notes-complete', async (req, res) => {
+  try {
+    const { lastLine } = req.body;
+    const prompt =
+      `Malik is taking EEE study notes. Continue his thought in 1–2 sentences naturally. ` +
+      `Do NOT repeat what is already written. Note so far: "${lastLine}"`;
+    const text = await callClaude(prompt, 120, MALIK_SYSTEM);
+    res.json({ text });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Notes expand
+app.post('/api/ai/notes-expand', async (req, res) => {
+  try {
+    const { notes } = req.body;
+    const prompt =
+      `Malik wrote these EEE study notes: "${notes}". ` +
+      `Add 3–4 key points he might have missed, one key formula or definition, ` +
+      `and one real-world application. Use bullet points.`;
+    const text = await callClaude(prompt, 500, MALIK_SYSTEM);
+    res.json({ text });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Career advice
+app.post('/api/ai/career-advice', async (req, res) => {
+  try {
+    const { careerTitle } = req.body;
+    const prompt =
+      `Malik is a 1st year EEE student at Swansea University interested in ${careerTitle}. ` +
+      `He has no industry experience yet. Give him:\n` +
+      `1) 3 specific, actionable things to do THIS TERM (next 3 months)\n` +
+      `2) One thing about this career most students don't know\n` +
+      `3) One Swansea-specific resource or opportunity to look into\n\n` +
+      `Be very specific and practical.`;
+    const text = await callClaude(prompt, 500, MALIK_SYSTEM);
+    res.json({ text });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Gym coach advice
+app.post('/api/ai/gym-advice', async (req, res) => {
+  try {
+    const { dayNum, dayTitle, exercises } = req.body;
+    const prompt =
+      `Malik is a beginner lifter doing Day ${dayNum}: ${dayTitle}. ` +
+      `Exercises: ${exercises.join(', ')}. ` +
+      `Give: 3 form tips for the most important exercises, ` +
+      `1 progressive overload tip, 1 recovery tip. Under 160 words.`;
+    const text = await callClaude(prompt, 350, MALIK_SYSTEM);
+    res.json({ text });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Hustle idea generator
+app.post('/api/ai/hustle-ideas', async (req, res) => {
+  try {
+    const { skills, timeAvailable } = req.body;
+    const prompt =
+      `Malik is a 1st year EEE student at Swansea University, UK. ` +
+      `His skills: ${skills}. Available time: ${timeAvailable || 'a few hours per week'}.\n\n` +
+      `Generate 5 realistic side hustle ideas. For each provide:\n` +
+      `- Name and one-line description\n` +
+      `- How to start THIS WEEK (specific first step)\n` +
+      `- Realistic monthly income potential (honest, not inflated)\n` +
+      `- Weekly time commitment\n` +
+      `- Why his EEE skills give him an edge\n\n` +
+      `Be specific and brutally honest about what's achievable as a busy student.`;
+    const text = await callClaude(prompt, 800, MALIK_SYSTEM);
+    res.json({ text });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Business idea deep analysis (new feature)
+app.post('/api/ai/business-analysis', async (req, res) => {
+  try {
+    const { idea } = req.body;
+    const prompt =
+      `Analyse this business idea for Malik, a 1st year EEE student at Swansea University:\n\n` +
+      `"${idea}"\n\n` +
+      `Provide a structured report covering:\n` +
+      `1) **Concept Summary** — what it is in plain English\n` +
+      `2) **Estimated Startup Cost** — realistic UK figures, broken down\n` +
+      `3) **Revenue Model** — how it makes money\n` +
+      `4) **Scalability** — ceiling and growth path (1→10→100 customers)\n` +
+      `5) **EEE Advantage** — how his engineering skills give him an edge\n` +
+      `6) **Biggest Risk** — one honest risk to watch out for\n` +
+      `7) **First 3 Steps** — what to do this week to validate it\n` +
+      `8) **Verdict** — honest 1-sentence assessment\n\n` +
+      `Be direct, specific, and honest. No fluff.`;
+    const text = await callClaude(prompt, 1000, MALIK_SYSTEM);
+    res.json({ text });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Project autocomplete
+app.post('/api/ai/project-autocomplete', async (req, res) => {
+  try {
+    const { text, context } = req.body;
+    const prompts = {
+      title:
+        `Malik is typing a project idea title: "${text}". ` +
+        `Give a one-sentence improved title, then suggest 3 related EEE project ideas. Concise.`,
+      description:
+        `Malik typed this project description: "${text}". ` +
+        `Expand with: exact components needed, skills gained, time estimate, one technical challenge. Under 100 words.`
+    };
+    const prompt = prompts[context] || `Complete this EEE project thought: "${text}"`;
+    const response = await callClaude(prompt, 250, MALIK_SYSTEM);
+    res.json({ text: response });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// IDEAS ROUTES
+// ═══════════════════════════════════════════════════════════════════════════════
+app.get('/api/ideas', async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM ideas ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/ideas', async (req, res) => {
+  try {
+    const { title, description, category, priority } = req.body;
+    const result = await db.query(
+      'INSERT INTO ideas (title, description, category, priority) VALUES ($1,$2,$3,$4) RETURNING *',
+      [title, description, category, priority]
+    );
+    res.json(result.rows[0]);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/ideas/:id', async (req, res) => {
+  try {
+    await db.query('DELETE FROM ideas WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GYM ROUTES
+// ═══════════════════════════════════════════════════════════════════════════════
+app.get('/api/gym/weights', async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM gym_weights ORDER BY day_num, exercise_idx');
+    const weights = {};
+    result.rows.forEach(r => { weights[`d${r.day_num}-${r.exercise_idx}`] = r.weight; });
+    res.json(weights);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/gym/weights', async (req, res) => {
+  try {
+    const { dayNum, exerciseIdx, weight } = req.body;
+    await db.query(
+      `INSERT INTO gym_weights (day_num, exercise_idx, weight) VALUES ($1,$2,$3)
+       ON CONFLICT (day_num, exercise_idx) DO UPDATE SET weight=$3, updated_at=NOW()`,
+      [dayNum, exerciseIdx, weight]
+    );
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/gym/sessions', async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM gym_sessions ORDER BY logged_at DESC LIMIT 30');
+    res.json(result.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/gym/sessions', async (req, res) => {
+  try {
+    const { dayNum, dayTitle, weights } = req.body;
+    const result = await db.query(
+      'INSERT INTO gym_sessions (day_num, day_title, weights) VALUES ($1,$2,$3) RETURNING *',
+      [dayNum, dayTitle, JSON.stringify(weights)]
+    );
+    res.json(result.rows[0]);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Gym progress data for chart
+app.get('/api/gym/progress/:dayNum/:exerciseIdx', async (req, res) => {
+  try {
+    const { dayNum, exerciseIdx } = req.params;
+    const result = await db.query(
+      `SELECT logged_at, weights->$1 as weight FROM gym_sessions 
+       WHERE day_num=$2 AND weights ? $1
+       ORDER BY logged_at ASC LIMIT 20`,
+      [`${exerciseIdx}`, dayNum]
+    );
+    res.json(result.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MODULES / GRADE CALCULATOR ROUTES
+// ═══════════════════════════════════════════════════════════════════════════════
+app.get('/api/modules', async (req, res) => {
+  try {
+    const mods = await db.query('SELECT * FROM modules WHERE year=$1 ORDER BY id', [1]);
+    const assessments = await db.query(
+      'SELECT * FROM assessments WHERE module_id = ANY($1)',
+      [mods.rows.map(m => m.id)]
+    );
+    const result = mods.rows.map(m => ({
+      ...m,
+      assessments: assessments.rows.filter(a => a.module_id === m.id)
+    }));
+    res.json(result);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/modules', async (req, res) => {
+  try {
+    const { name, credits, year = 1 } = req.body;
+    const result = await db.query(
+      'INSERT INTO modules (name, credits, year) VALUES ($1,$2,$3) RETURNING *',
+      [name, credits, year]
+    );
+    res.json(result.rows[0]);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/modules/:id', async (req, res) => {
+  try {
+    await db.query('DELETE FROM modules WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/modules/:id/assessments', async (req, res) => {
+  try {
+    const { name, weight, score, maxScore = 100 } = req.body;
+    const result = await db.query(
+      'INSERT INTO assessments (module_id, name, weight, score, max_score) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+      [req.params.id, name, weight, score, maxScore]
+    );
+    res.json(result.rows[0]);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/assessments/:id', async (req, res) => {
+  try {
+    const { score } = req.body;
+    const result = await db.query(
+      'UPDATE assessments SET score=$1, updated_at=NOW() WHERE id=$2 RETURNING *',
+      [score, req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/assessments/:id', async (req, res) => {
+  try {
+    await db.query('DELETE FROM assessments WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PROJECTS ROUTES
+// ═══════════════════════════════════════════════════════════════════════════════
+app.get('/api/projects', async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM projects ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/projects', async (req, res) => {
+  try {
+    const { title, description, category, mindmapText } = req.body;
+    const result = await db.query(
+      'INSERT INTO projects (title, description, category, mindmap_text) VALUES ($1,$2,$3,$4) RETURNING *',
+      [title, description, category, mindmapText]
+    );
+    res.json(result.rows[0]);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/projects/:id', async (req, res) => {
+  try {
+    const { title, description, status, progress, mindmapText } = req.body;
+    const result = await db.query(
+      `UPDATE projects SET title=$1, description=$2, status=$3, progress=$4, 
+       mindmap_text=$5, updated_at=NOW() WHERE id=$6 RETURNING *`,
+      [title, description, status, progress, mindmapText, req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/projects/:id', async (req, res) => {
+  try {
+    await db.query('DELETE FROM projects WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// QURAN ROUTES
+// ═══════════════════════════════════════════════════════════════════════════════
+app.get('/api/quran/today', async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const result = await db.query('SELECT * FROM quran_log WHERE date=$1', [today]);
+    res.json(result.rows[0] || { sabaq:0, sabqi:0, manzil:0, tilawah:0, notes:'' });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/quran/today', async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const { sabaq, sabqi, manzil, tilawah, notes } = req.body;
+    await db.query(
+      `INSERT INTO quran_log (date, sabaq, sabqi, manzil, tilawah, notes) VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (date) DO UPDATE SET sabaq=$2, sabqi=$3, manzil=$4, tilawah=$5, notes=$6`,
+      [today, sabaq, sabqi, manzil, tilawah, notes]
+    );
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HABITS ROUTES
+// ═══════════════════════════════════════════════════════════════════════════════
+function getWeekStart() {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = (day === 6) ? 0 : (day + 1); // Week starts Saturday
+  d.setDate(d.getDate() - diff);
+  return d.toISOString().split('T')[0];
+}
+
+app.get('/api/habits', async (req, res) => {
+  try {
+    const week = getWeekStart();
+    const result = await db.query(
+      'SELECT * FROM habits WHERE week_start=$1', [week]
+    );
+    const state = {};
+    result.rows.forEach(r => { state[`${r.habit_idx}-${r.day_idx}`] = r.done; });
+    res.json({ weekStart: week, state });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/habits/toggle', async (req, res) => {
+  try {
+    const { habitIdx, dayIdx, done } = req.body;
+    const week = getWeekStart();
+    await db.query(
+      `INSERT INTO habits (week_start, habit_idx, day_idx, done) VALUES ($1,$2,$3,$4)
+       ON CONFLICT (week_start, habit_idx, day_idx) DO UPDATE SET done=$4`,
+      [week, habitIdx, dayIdx, done]
+    );
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/habits/reset', async (req, res) => {
+  try {
+    const week = getWeekStart();
+    await db.query('DELETE FROM habits WHERE week_start=$1', [week]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── START ──────────────────────────────────────────────────────────────────────
+app.listen(PORT, async () => {
+  console.log(`MALIK OS Backend running on port ${PORT}`);
+  await initDB();
+});
