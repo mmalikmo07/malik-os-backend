@@ -128,6 +128,67 @@ app.get('/', (req, res) => res.json({
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// TAVILY WEB SEARCH
+// ═══════════════════════════════════════════════════════════════════════════════
+const TAVILY_KEY = process.env.TAVILY_API_KEY;
+
+const SEARCH_TRIGGERS = [
+  'news','latest','today','current','right now','this week','this month',
+  '2026','just happened','recently','update','announced','released',
+  'launched','new model','new version','stock','price','who is',
+  'what happened','trending','breaking','march','april','may'
+];
+
+function needsWebSearch(prompt) {
+  if(!TAVILY_KEY) return false;
+  const lower = prompt.toLowerCase();
+  return SEARCH_TRIGGERS.some(t => lower.includes(t));
+}
+
+async function tavilySearch(query) {
+  try {
+    const res = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: TAVILY_KEY,
+        query,
+        search_depth: 'basic',
+        max_results: 5,
+        include_answer: true
+      })
+    });
+    if(!res.ok) throw new Error('Tavily ' + res.status);
+    const data = await res.json();
+    const results = (data.results || []).slice(0, 5).map((r, i) =>
+      '[' + (i+1) + '] ' + r.title + '\nSource: ' + r.url + '\n' + (r.content || '').substring(0, 400)
+    ).join('\n\n');
+    return { answer: data.answer || '', results };
+  } catch(e) {
+    console.warn('Tavily search failed:', e.message);
+    return null;
+  }
+}
+
+async function askWithSearch(prompt, maxTokens, system) {
+  if(needsWebSearch(prompt)) {
+    const searchData = await tavilySearch(prompt);
+    if(searchData && (searchData.answer || searchData.results)) {
+      const augmented =
+        'The user asked: "' + prompt + '"\n\n' +
+        'I searched the web and found this live data:\n\n' +
+        (searchData.answer ? 'DIRECT ANSWER: ' + searchData.answer + '\n\n' : '') +
+        'SOURCES:\n' + searchData.results + '\n\n' +
+        'Now answer the user using this live data. Be specific, reference sources naturally, ' +
+        'add your own analysis and connect it to their EEE/tech interests where relevant. ' +
+        'Do not say you lack real-time access — you have the data above.';
+      return callClaude(augmented, maxTokens, system);
+    }
+  }
+  return callClaude(prompt, maxTokens, system);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // AI ROUTES — all Claude calls happen server-side, zero CORS issues
 // ═══════════════════════════════════════════════════════════════════════════════
 async function callClaude(prompt, maxTokens = 600, systemPrompt = null) {
@@ -188,17 +249,17 @@ YOUR PERSONALITY & RULES:
 - You speak to Malik as an equal — not as a student who needs hand-holding
 - You use his context naturally — reference his EEE background, his Swansea courses, his goals
 - For technical questions: go deep, use actual examples, real code if helpful
-- For current events/news: give everything you know up to your knowledge cutoff, then note the cutoff briefly
+- For current events/news: you have LIVE web search — use the search results provided to give up-to-date, specific answers. Never claim you lack real-time access when search results are present in the prompt
 - Format responses clearly with structure when helpful, but don't pad with filler
 - You are ambitious on his behalf — push him to think bigger, move faster, aim higher
 - Never be preachy about religion, health, or lifestyle choices — he has those covered`;
 
-// General AI chat
+// General AI chat — uses Tavily web search for current events questions
 app.post('/api/ai/ask', async (req, res) => {
   try {
     const { prompt, maxTokens = 1200 } = req.body;
     if(!prompt) return res.status(400).json({ error: 'prompt required' });
-    const text = await callClaude(prompt, maxTokens, MALIK_SYSTEM);
+    const text = await askWithSearch(prompt, maxTokens, MALIK_SYSTEM);
     res.json({ text });
   } catch(e) {
     res.status(500).json({ error: e.message });
