@@ -294,9 +294,59 @@ app.post('/api/ai/explain', async (req, res) => {
     };
     const prompt =
       `Please ${levelMap[level] || levelMap['Student']}: ${concept}. ` +
-      `Connect it to electrical engineering applications wherever possible. Use clear structure.`;
-    const text = await callClaude(prompt, 900, MALIK_SYSTEM);
+      `Connect it to electrical engineering applications wherever possible. ` +
+      `Use proper markdown formatting: # for main title, ## for section headers, ### for subsections, ` +
+      `**bold** for key terms, *italic* for emphasis, \`code\` for variables/equations, ` +
+      `\`\`\`code blocks\`\`\` for multi-line equations, - for bullet points, and > for important notes. ` +
+      `Structure the explanation with clear sections.`;
+    const text = await callClaude(prompt, 1200, MALIK_SYSTEM);
     res.json({ text });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Simulation suggestions
+app.post('/api/ai/sim-suggest', async (req, res) => {
+  try {
+    const { concept } = req.body;
+    const prompt =
+      `For the concept "${concept}", list 3-5 aspects that could be visualised as interactive simulations. ` +
+      `Format each as a numbered list: "1. Title — Brief description of what the simulation would show". ` +
+      `Focus on things that can be visualised with HTML5 Canvas, animations, sliders, or graphs. ` +
+      `Only suggest things that are genuinely simulatable and educational.`;
+    const text = await callClaude(prompt, 300, MALIK_SYSTEM);
+    res.json({ text });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Simulation code generation
+app.post('/api/ai/simulate', async (req, res) => {
+  try {
+    const { concept, simulation } = req.body;
+    const prompt =
+      `Create a complete, standalone HTML page that simulates "${simulation}" related to "${concept}". ` +
+      `Requirements:\n` +
+      `- Self-contained single HTML file with inline CSS and JS\n` +
+      `- Dark theme: background #0a0a0e, text #e8e8f0, accent colors #c8ff00 (lime) and #00e5cc (teal)\n` +
+      `- Use HTML5 Canvas for visualisations where appropriate\n` +
+      `- Include interactive controls (sliders, buttons) to adjust parameters\n` +
+      `- Add labels and explanations within the simulation\n` +
+      `- Must be educational and clearly demonstrate the concept\n` +
+      `- Use requestAnimationFrame for smooth animations\n` +
+      `- Make it responsive (use % widths)\n` +
+      `- Include a title bar at the top with the simulation name\n` +
+      `- NO external dependencies, everything inline\n` +
+      `Return ONLY the complete HTML code, nothing else. No markdown code fences.`;
+    const text = await callClaude(prompt, 4000, MALIK_SYSTEM);
+    // Extract just the HTML if wrapped in code fences
+    let code = text.trim();
+    if(code.startsWith('```')) {
+      code = code.replace(/^```html?\n?/, '').replace(/\n?```$/, '');
+    }
+    res.json({ code });
   } catch(e) {
     res.status(500).json({ error: e.message });
   }
