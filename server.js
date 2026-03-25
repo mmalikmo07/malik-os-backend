@@ -322,46 +322,56 @@ app.post('/api/ai/sim-suggest', async (req, res) => {
   }
 });
 
-// Simulation code generation
+// Simulation code generation — uses p5.js for reliable interactive simulations
 app.post('/api/ai/simulate', async (req, res) => {
   try {
     const { concept, simulation } = req.body;
     const prompt =
-      `Generate a COMPLETE working HTML page that creates an interactive simulation of "${simulation}" for the concept "${concept}".\n\n` +
-      `CRITICAL REQUIREMENTS — the simulation MUST actually draw and animate:\n` +
-      `1. Use <canvas> elements. Get context with canvas.getContext('2d').\n` +
-      `2. Write a draw() function that CLEARS the canvas (ctx.clearRect), then draws shapes/lines/arcs using ctx.beginPath(), ctx.moveTo(), ctx.lineTo(), ctx.arc(), ctx.stroke(), ctx.fill(), ctx.fillText() etc.\n` +
-      `3. Call draw() inside a requestAnimationFrame loop so it animates continuously.\n` +
-      `4. For waveforms: use ctx.beginPath(), loop through x values, compute y = amplitude * Math.sin(2*Math.PI*freq*x/width + phase), and use ctx.lineTo(x, centerY - y).\n` +
-      `5. Make sliders update variables that the draw() function reads. Add 'input' event listeners to each slider.\n` +
-      `6. Set canvas.width and canvas.height EXPLICITLY in JavaScript (not just CSS), e.g. canvas.width = canvas.parentElement.clientWidth.\n` +
-      `7. Color scheme: background #0a0a0e, text #e8e8f0, use colors #c8ff00 (lime), #00e5cc (teal), #ff3366 (red), #fbbf24 (gold) for different data series.\n` +
-      `8. All code in a single HTML file with inline <style> and <script>.\n` +
-      `9. Put ALL JavaScript inside window.onload = function() { ... } to ensure DOM is ready.\n` +
-      `10. Do NOT use any external libraries.\n\n` +
-      `Structure your code like this:\n` +
-      `<html><head><style>/* dark theme styles */</style></head><body>\n` +
-      `<div id="controls"><!-- sliders with labels --></div>\n` +
-      `<canvas id="mainCanvas"></canvas>\n` +
+      `Generate a COMPLETE working HTML page using p5.js that creates an interactive simulation of "${simulation}" for the concept "${concept}".\n\n` +
+      `You MUST use p5.js loaded from CDN: <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>\n\n` +
+      `REQUIREMENTS:\n` +
+      `1. Use p5.js global mode with setup() and draw() functions.\n` +
+      `2. In setup(): createCanvas(containerWidth, 500), set background.\n` +
+      `3. In draw(): this runs automatically 60 times per second — draw your simulation here.\n` +
+      `4. Use frameCount for time-based animation (e.g. let t = frameCount * 0.02 for smooth time).\n` +
+      `5. Create sliders with createSlider(min, max, default, step) — read their .value() in draw().\n` +
+      `6. For waveforms: loop x from 0 to width, compute y, use vertex() inside beginShape()/endShape().\n` +
+      `7. Use stroke(), fill(), line(), ellipse(), arc(), text() etc.\n` +
+      `8. Color scheme: background(10, 10, 14), use color(200,255,0) for lime, color(0,229,204) for teal, color(255,51,102) for red, color(251,191,36) for gold.\n` +
+      `9. CRITICAL: All slider values MUST be read INSIDE draw() so changes take effect IMMEDIATELY. Example: let amp = ampSlider.value();\n` +
+      `10. Put all p5.js code in a <script> tag AFTER the p5.js CDN script.\n\n` +
+      `EXAMPLE of a WORKING 3-phase waveform simulation:\n` +
+      `<html><head>\n` +
+      `<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>\n` +
+      `<style>body{margin:0;background:#0a0a0e;color:#e8e8f0;font-family:monospace;overflow:hidden}</style>\n` +
+      `</head><body>\n` +
       `<script>\n` +
-      `window.onload = function() {\n` +
-      `  const canvas = document.getElementById('mainCanvas');\n` +
-      `  const ctx = canvas.getContext('2d');\n` +
-      `  canvas.width = canvas.parentElement.clientWidth || 800;\n` +
-      `  canvas.height = 400;\n` +
-      `  let param1 = 50; // from slider\n` +
-      `  document.getElementById('slider1').addEventListener('input', function(e) { param1 = parseFloat(e.target.value); });\n` +
-      `  function draw() {\n` +
-      `    ctx.clearRect(0, 0, canvas.width, canvas.height);\n` +
-      `    // ACTUAL DRAWING CODE HERE using ctx\n` +
-      `    requestAnimationFrame(draw);\n` +
+      `let freqSlider, ampSlider;\n` +
+      `function setup() {\n` +
+      `  createCanvas(windowWidth, 500);\n` +
+      `  freqSlider = createSlider(1, 10, 3, 0.1);\n` +
+      `  ampSlider = createSlider(10, 200, 100, 1);\n` +
+      `}\n` +
+      `function draw() {\n` +
+      `  background(10, 10, 14);\n` +
+      `  let freq = freqSlider.value();\n` +
+      `  let amp = ampSlider.value();\n` +
+      `  let t = frameCount * 0.03;\n` +
+      `  stroke(200, 255, 0);\n` +
+      `  noFill();\n` +
+      `  beginShape();\n` +
+      `  for (let x = 0; x < width; x++) {\n` +
+      `    let y = height/2 + amp * sin(TWO_PI * freq * x/width + t);\n` +
+      `    vertex(x, y);\n` +
       `  }\n` +
-      `  draw();\n` +
-      `};\n` +
+      `  endShape();\n` +
+      `}\n` +
+      `function windowResized() { resizeCanvas(windowWidth, 500); }\n` +
       `</script></body></html>\n\n` +
-      `Return ONLY the HTML code. No markdown fences. No explanations.`;
+      `Your simulation should be MUCH more sophisticated than this example — include multiple visual elements, labels, grids, legends, and proper physics/maths.\n` +
+      `Style the sliders and labels nicely with CSS.\n` +
+      `Return ONLY the HTML code. No markdown fences. No explanations outside the code.`;
     const text = await callClaude(prompt, 4096, MALIK_SYSTEM);
-    // Extract just the HTML if wrapped in code fences
     let code = text.trim();
     const fence = '`'.repeat(3);
     if(code.startsWith(fence)) {
