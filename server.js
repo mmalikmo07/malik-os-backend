@@ -296,9 +296,9 @@ app.post('/api/ai/explain', async (req, res) => {
       `Please ${levelMap[level] || levelMap['Student']}: ${concept}. ` +
       `Connect it to electrical engineering applications wherever possible. ` +
       `Use proper markdown formatting: # for main title, ## for section headers, ### for subsections, ` +
-      `**bold** for key terms, *italic* for emphasis, \`code\` for variables/equations, ` +
-      `\`\`\`code blocks\`\`\` for multi-line equations, - for bullet points, and > for important notes. ` +
-      `Structure the explanation with clear sections.`;
+      `**bold** for key terms, *italic* for emphasis, - for bullet points, and > for important notes. ` +
+      `For ALL equations and mathematical expressions, use LaTeX notation: $...$ for inline math and $$...$$ for display math. ` +
+      `Never write equations as plain text. Structure the explanation with clear sections.`;
     const text = await callClaude(prompt, 1200, MALIK_SYSTEM);
     res.json({ text });
   } catch(e) {
