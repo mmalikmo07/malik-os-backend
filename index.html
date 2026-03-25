@@ -1,0 +1,3114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MALIK·OS — Personal Command Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Bebas+Neue&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════
+   DESIGN TOKENS — Student OS v2 palette
+═══════════════════════════════════════ */
+:root{
+  --bg:#060608;--s1:#0e0e12;--s2:#16161c;
+  --border:#1e1e26;--border2:#2a2a36;
+  --lime:#c8ff00;--orange:#ff5500;--teal:#00e5cc;
+  --violet:#8b5cf6;--pink:#ff3d7f;--sky:#38bdf8;--gold:#fbbf24;
+  --red:#ff3366;--green:#00ff88;
+  --text:#e8e8f0;--muted:#5a5a72;--muted2:#3a3a4e;
+  --mono:'Space Mono',monospace;
+  --display:'Bebas Neue',sans-serif;
+  --serif:'Lora',serif;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:auto;}
+
+body{
+  background:var(--bg);color:var(--text);
+  font-family:var(--mono);font-size:13px;line-height:1.7;
+  min-height:100vh;overflow-x:hidden;cursor:crosshair;
+}
+
+/* Noise texture overlay */
+body::after{
+  content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9998;
+}
+
+/* Scanlines */
+body::before{
+  content:'';position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(200,255,0,0.007) 2px,rgba(200,255,0,0.007) 4px);
+  pointer-events:none;z-index:9997;
+}
+
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--lime);}
+
+/* ═══════════════════════════════════════
+   TOP BAR
+═══════════════════════════════════════ */
+.topbar{
+  position:fixed;top:0;left:0;right:0;height:52px;
+  background:rgba(6,6,8,0.96);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;z-index:1000;backdrop-filter:blur(12px);
+}
+.topbar-logo{
+  font-family:var(--display);font-size:22px;letter-spacing:0.15em;
+  color:var(--lime);
+}
+.topbar-logo span{color:var(--muted);}
+.topbar-nav{display:flex;gap:2px;}
+.nav-btn{
+  padding:0 14px;height:36px;
+  font-family:var(--mono);font-size:10px;font-weight:700;
+  letter-spacing:0.12em;text-transform:uppercase;
+  background:transparent;border:1px solid transparent;
+  color:var(--muted);cursor:pointer;transition:all 0.15s;
+  white-space:nowrap;
+}
+.nav-btn:hover{color:var(--text);border-color:var(--border2);}
+.nav-btn.active{color:var(--lime);border-color:var(--lime);background:rgba(200,255,0,0.05);}
+.topbar-right{display:flex;align-items:center;gap:12px;}
+.status-dot{
+  width:8px;height:8px;background:var(--muted2);
+  border-radius:50%;transition:all 0.3s;flex-shrink:0;
+}
+.status-dot.live{background:var(--lime);box-shadow:0 0 8px var(--lime);animation:blink-dot 2s infinite;}
+@keyframes blink-dot{0%,100%{opacity:1;}50%{opacity:0.5;}}
+.topbar-time{font-size:11px;color:var(--muted);letter-spacing:0.1em;transition:all 0.2s;cursor:default;}
+.topbar-time:hover{color:var(--lime);text-shadow:0 0 8px rgba(200,255,0,0.5);}
+#topbar-date{transition:all 0.2s;cursor:default;}
+#topbar-date:hover{color:var(--lime)!important;border-color:var(--lime)!important;text-shadow:0 0 8px rgba(200,255,0,0.5);}
+
+#api-key-input{
+  background:var(--s1);border:1px solid var(--border2);
+  border-bottom:1px solid var(--lime);
+  color:var(--lime);font-family:var(--mono);font-size:10px;
+  padding:4px 10px;width:200px;outline:none;
+}
+#api-key-input::placeholder{color:var(--muted2);}
+#api-key-btn{
+  padding:5px 14px;background:rgba(200,255,0,0.08);
+  border:1px solid var(--lime);color:var(--lime);
+  font-family:var(--mono);font-size:10px;font-weight:700;
+  cursor:pointer;letter-spacing:0.1em;transition:all 0.15s;
+}
+#api-key-btn:hover{background:rgba(200,255,0,0.18);}
+
+/* ═══════════════════════════════════════
+   LAYOUT
+═══════════════════════════════════════ */
+.os-layout{display:flex;height:100vh;padding-top:52px;}
+
+/* SIDEBAR */
+.sidebar{
+  width:56px;background:var(--s1);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;
+  padding:16px 0;gap:4px;flex-shrink:0;
+}
+.sidebar-item{
+  width:40px;height:40px;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid transparent;cursor:pointer;
+  transition:all 0.15s;font-size:18px;
+  position:relative;
+}
+.sidebar-item:hover,.sidebar-item.active{
+  background:rgba(200,255,0,0.07);
+  border-color:var(--lime);
+}
+.sidebar-item .tip{
+  position:absolute;left:52px;background:var(--s2);
+  border:1px solid var(--border2);padding:4px 10px;
+  font-size:9px;font-weight:700;letter-spacing:0.12em;
+  color:var(--lime);white-space:nowrap;opacity:0;pointer-events:none;
+  transition:opacity 0.15s;text-transform:uppercase;z-index:10;
+}
+.sidebar-item:hover .tip{opacity:1;}
+.sidebar-sep{width:24px;height:1px;background:var(--border);margin:4px 0;}
+
+/* MAIN */
+.main{flex:1;overflow-y:auto;overflow-x:hidden;padding:28px;}
+.page{display:none;}
+.page.active{display:block;animation:pageIn 0.25s ease;}
+@keyframes pageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ═══════════════════════════════════════
+   PANEL SYSTEM
+═══════════════════════════════════════ */
+.panel{
+  background:var(--s1);border:1px solid var(--border);
+  margin-bottom:14px;position:relative;overflow:hidden;
+}
+.panel::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--lime),transparent);
+  opacity:0.4;
+}
+.panel-header{
+  padding:11px 18px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);
+}
+.panel-title{
+  font-size:9px;font-weight:700;
+  letter-spacing:0.2em;color:var(--lime);
+  text-transform:uppercase;
+}
+.panel-body{padding:18px;}
+
+/* SECTION LABEL */
+.section-tag{
+  display:inline-flex;align-items:center;gap:10px;
+  font-size:9px;letter-spacing:0.25em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:10px;
+}
+.section-tag::before{content:'';display:block;width:20px;height:1px;background:var(--lime);}
+
+h2{
+  font-family:var(--display);
+  font-size:clamp(28px,4vw,52px);
+  letter-spacing:0.04em;line-height:1;margin-bottom:28px;
+}
+
+/* GRIDS */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+@media(max-width:700px){.grid-2,.grid-3{grid-template-columns:1fr;}}
+
+/* STAT CARDS */
+.stat-card{
+  background:var(--s2);border:1px solid var(--border);
+  padding:16px 18px;position:relative;overflow:hidden;
+}
+.stat-card::after{content:'';position:absolute;top:0;left:0;width:2px;height:100%;background:var(--lime);}
+.stat-val{font-family:var(--display);font-size:36px;color:var(--lime);line-height:1;}
+.stat-label{font-size:9px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-top:4px;}
+
+/* ═══════════════════════════════════════
+   BUTTONS
+═══════════════════════════════════════ */
+.btn{
+  padding:8px 18px;font-family:var(--mono);
+  font-size:10px;font-weight:700;letter-spacing:0.15em;
+  text-transform:uppercase;cursor:pointer;border:1px solid;
+  transition:all 0.15s;background:transparent;white-space:nowrap;
+}
+.btn-lime{border-color:var(--lime);color:var(--lime);}
+.btn-lime:hover{background:rgba(200,255,0,0.1);}
+.btn-orange{border-color:var(--orange);color:var(--orange);}
+.btn-orange:hover{background:rgba(255,85,0,0.1);}
+.btn-teal{border-color:var(--teal);color:var(--teal);}
+.btn-teal:hover{background:rgba(0,229,204,0.1);}
+.btn-gold{border-color:var(--gold);color:var(--gold);}
+.btn-gold:hover{background:rgba(251,191,36,0.1);}
+.btn-violet{border-color:var(--violet);color:var(--violet);}
+.btn-violet:hover{background:rgba(139,92,246,0.1);}
+.btn-sm{padding:5px 12px;font-size:9px;}
+
+/* ═══════════════════════════════════════
+   INPUTS
+═══════════════════════════════════════ */
+.os-input{
+  width:100%;background:var(--s2);
+  border:1px solid var(--border2);border-bottom:1px solid var(--lime);
+  color:var(--text);font-family:var(--mono);font-size:12px;
+  padding:9px 12px;outline:none;transition:border-color 0.15s;
+}
+.os-input:focus{border-color:var(--lime);box-shadow:0 4px 10px rgba(200,255,0,0.06);}
+.os-input::placeholder{color:var(--muted2);}
+
+.os-textarea{
+  width:100%;background:var(--s2);
+  border:1px solid var(--border2);border-bottom:1px solid var(--lime);
+  color:var(--text);font-family:var(--mono);font-size:12px;
+  padding:10px 12px;outline:none;resize:vertical;min-height:110px;line-height:1.7;
+}
+.os-textarea:focus{border-color:var(--lime);}
+.os-textarea::placeholder{color:var(--muted2);}
+
+select.os-input{cursor:pointer;}
+
+/* ═══════════════════════════════════════
+   AI SUGGESTION BOX
+═══════════════════════════════════════ */
+.ai-box{
+  background:rgba(200,255,0,0.03);
+  border:1px solid var(--border2);
+  border-left:2px solid var(--lime);
+  padding:12px 14px;font-size:12px;
+  color:var(--muted);min-height:44px;margin-top:8px;
+  position:relative;line-height:1.7;
+}
+.ai-box::before{
+  content:'AI ►';font-size:9px;color:var(--lime);letter-spacing:0.2em;
+  position:absolute;top:-8px;left:10px;
+  background:var(--s1);padding:0 6px;
+}
+.ai-box.loading{color:var(--lime);animation:pulse-text 1s infinite;}
+@keyframes pulse-text{0%,100%{opacity:1;}50%{opacity:0.3;}}
+
+/* ═══════════════════════════════════════
+   TAGS
+═══════════════════════════════════════ */
+.tag{
+  display:inline-block;padding:2px 9px;
+  font-size:9px;letter-spacing:0.1em;
+  border:1px solid;margin:2px;
+  text-transform:uppercase;
+}
+.tag-lime{border-color:var(--lime);color:var(--lime);background:rgba(200,255,0,0.06);}
+.tag-gold{border-color:var(--gold);color:var(--gold);background:rgba(251,191,36,0.06);}
+.tag-teal{border-color:var(--teal);color:var(--teal);background:rgba(0,229,204,0.06);}
+.tag-violet{border-color:var(--violet);color:var(--violet);background:rgba(139,92,246,0.06);}
+.tag-orange{border-color:var(--orange);color:var(--orange);background:rgba(255,85,0,0.06);}
+
+/* ═══════════════════════════════════════
+   MODE TOGGLE
+═══════════════════════════════════════ */
+.mode-toggle{display:flex;gap:0;margin-bottom:14px;}
+.mode-btn{
+  padding:8px 18px;font-size:10px;font-weight:700;
+  letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;
+  border:1px solid var(--border2);background:transparent;
+  color:var(--muted);transition:all 0.15s;font-family:var(--mono);
+}
+.mode-btn.active{background:rgba(200,255,0,0.1);border-color:var(--lime);color:var(--lime);}
+
+/* ═══════════════════════════════════════
+   PROGRESS BAR
+═══════════════════════════════════════ */
+.prog-track{height:2px;background:var(--border2);margin:8px 0;}
+.prog-fill{height:100%;background:var(--lime);transition:width 0.6s ease;}
+
+/* ═══════════════════════════════════════
+   PROJECT CARDS
+═══════════════════════════════════════ */
+.project-card{
+  background:var(--s2);border:1px solid var(--border);
+  padding:16px;margin-bottom:8px;
+  display:grid;grid-template-columns:1fr auto;
+  gap:12px;align-items:start;transition:border-color 0.15s;
+}
+.project-card:hover{border-color:var(--border2);}
+.project-card-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;}
+.project-card-desc{font-size:11px;color:var(--muted);line-height:1.6;}
+
+/* ═══════════════════════════════════════
+   IDEA LIST
+═══════════════════════════════════════ */
+.idea-item{
+  background:var(--s2);border:1px solid var(--border);
+  padding:12px 14px;margin-bottom:6px;
+  display:flex;justify-content:space-between;align-items:start;
+  transition:border-color 0.15s;
+}
+.idea-item:hover{border-color:var(--border2);}
+.idea-meta{font-size:10px;color:var(--muted2);margin-top:3px;}
+.icon-btn{
+  background:none;border:1px solid var(--border2);color:var(--muted2);
+  padding:3px 8px;cursor:pointer;font-size:11px;transition:all 0.15s;
+}
+.icon-btn:hover{border-color:var(--orange);color:var(--orange);}
+
+/* ═══════════════════════════════════════
+   MINDMAP
+═══════════════════════════════════════ */
+#mindmap-svg{width:100%;height:480px;background:var(--s2);border:1px solid var(--border);}
+
+/* Mindmap overlay controls — Google Maps style */
+.mm-controls{
+  position:absolute;bottom:16px;right:16px;
+  display:flex;flex-direction:column;gap:2px;
+  z-index:10;
+}
+.mm-ctrl-btn{
+  width:40px;height:40px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(14,14,18,0.92);
+  border:1px solid var(--border2);
+  color:var(--lime);font-size:18px;font-weight:700;
+  cursor:pointer;transition:all 0.15s;
+  font-family:var(--mono);backdrop-filter:blur(8px);
+  user-select:none;line-height:1;
+}
+.mm-ctrl-btn:first-child{border-radius:6px 6px 0 0;}
+.mm-ctrl-btn:last-child{border-radius:0 0 6px 6px;}
+.mm-ctrl-btn:only-child{border-radius:6px;}
+.mm-ctrl-btn:hover{background:rgba(200,255,0,0.12);border-color:var(--lime);}
+.mm-ctrl-btn:active{background:rgba(200,255,0,0.22);transform:scale(0.92);}
+.mm-ctrl-sep{width:100%;height:1px;background:var(--border2);}
+
+.mm-reset-btn{
+  position:absolute;bottom:16px;left:16px;
+  width:40px;height:40px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(14,14,18,0.92);border:1px solid var(--border2);
+  border-radius:6px;color:var(--lime);font-size:16px;
+  cursor:pointer;transition:all 0.15s;z-index:10;
+  backdrop-filter:blur(8px);
+}
+.mm-reset-btn:hover{background:rgba(200,255,0,0.12);border-color:var(--lime);}
+.mm-reset-btn:active{transform:scale(0.92);}
+
+/* Mindmap zoom level badge */
+.mm-zoom-badge{
+  position:absolute;bottom:18px;left:50%;transform:translateX(-50%);
+  background:rgba(14,14,18,0.85);border:1px solid var(--border2);
+  border-radius:4px;padding:3px 10px;font-size:9px;
+  color:var(--muted);letter-spacing:0.1em;z-index:10;
+  pointer-events:none;transition:opacity 0.3s;
+  font-family:var(--mono);backdrop-filter:blur(8px);
+}
+
+/* Grid texture for mindmap canvas */
+.mm-canvas{
+  margin-top:10px;overflow:hidden;
+  border:1px solid var(--border);
+  background:
+    radial-gradient(circle, rgba(200,255,0,0.08) 1px, transparent 1px),
+    #12121a;
+  background-size: 24px 24px;
+  cursor:grab;position:relative;
+  min-height:500px;
+  border-radius:4px;
+  border:none;
+}
+.mm-canvas.grabbing{cursor:grabbing;}
+
+/* Smooth SVG transform */
+#mindmap-svg{
+  transform-origin:0 0;
+  will-change:transform;
+}
+
+/* ═══════════════════════════════════════
+   CAREER CARDS
+═══════════════════════════════════════ */
+.career-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
+.career-card{
+  background:var(--s2);border:1px solid var(--border);
+  padding:18px;cursor:pointer;transition:all 0.15s;
+  position:relative;overflow:hidden;
+}
+.career-card::before{content:'';position:absolute;top:0;left:0;width:2px;height:100%;}
+.career-card:hover{border-color:var(--border2);transform:translateY(-2px);}
+.career-card-icon{font-size:26px;margin-bottom:8px;}
+.career-card-title{font-family:var(--display);font-size:16px;letter-spacing:0.06em;margin-bottom:5px;}
+.career-card-desc{font-size:11px;color:var(--muted);line-height:1.6;}
+.career-detail{display:none;}
+.career-detail.active{display:block;animation:pageIn 0.25s ease;}
+.resource-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-top:10px;}
+.resource-item{background:var(--s1);border:1px solid var(--border);padding:11px;}
+.resource-item-type{font-size:9px;letter-spacing:0.15em;color:var(--lime);text-transform:uppercase;margin-bottom:3px;}
+.resource-item-name{font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px;}
+.resource-item-desc{font-size:10px;color:var(--muted);}
+
+/* ═══════════════════════════════════════
+   HABIT TRACKER
+═══════════════════════════════════════ */
+.habit-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
+.habit-name{font-size:12px;font-weight:700;min-width:170px;}
+.habit-dots{display:flex;gap:3px;}
+.hdot{
+  width:20px;height:20px;border:1px solid var(--border2);
+  cursor:pointer;transition:all 0.15s;
+}
+.hdot:hover{border-color:var(--lime);}
+.hdot.done{background:var(--lime);border-color:var(--lime);}
+.habit-streak{font-family:var(--display);font-size:18px;color:var(--gold);min-width:28px;}
+
+/* ═══════════════════════════════════════
+   GYM TABLE
+═══════════════════════════════════════ */
+.gym-table{width:100%;border-collapse:collapse;}
+.gym-table th{font-size:9px;letter-spacing:0.2em;color:var(--muted);padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);}
+.gym-table td{padding:10px;font-size:12px;border-bottom:1px solid var(--border);}
+.gym-table tr:hover td{background:rgba(200,255,0,0.02);}
+.weight-input{
+  background:transparent;border:none;border-bottom:1px solid var(--border2);
+  color:var(--text);font-family:var(--mono);font-size:11px;
+  width:70px;outline:none;padding:2px 4px;text-align:center;
+}
+.weight-input:focus{border-bottom-color:var(--lime);}
+
+/* ═══════════════════════════════════════
+   QURAN CARDS
+═══════════════════════════════════════ */
+.quran-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+@media(max-width:600px){.quran-grid{grid-template-columns:1fr;}}
+.quran-card{background:var(--s2);border:1px solid var(--border);padding:16px;text-align:center;}
+.quran-arabic{font-size:30px;color:var(--gold);direction:rtl;margin-bottom:6px;line-height:1.2;}
+.quran-label{font-size:9px;color:var(--muted);letter-spacing:0.2em;margin-bottom:10px;text-transform:uppercase;}
+.quran-counter{font-family:var(--display);font-size:40px;color:var(--lime);}
+.quran-btn-row{display:flex;gap:6px;justify-content:center;margin-top:8px;}
+.counter-btn{
+  width:30px;height:30px;background:var(--s1);border:1px solid var(--border2);
+  color:var(--text);cursor:pointer;font-size:16px;
+  display:flex;align-items:center;justify-content:center;transition:all 0.15s;
+}
+.counter-btn:hover{border-color:var(--lime);color:var(--lime);}
+
+/* ═══════════════════════════════════════
+   SPINNER
+═══════════════════════════════════════ */
+.spinner{
+  display:inline-block;width:11px;height:11px;
+  border:2px solid var(--border2);border-top-color:var(--lime);
+  border-radius:50%;animation:spin 0.7s linear infinite;
+  vertical-align:middle;margin-right:6px;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ═══════════════════════════════════════
+   NOTIFICATION
+═══════════════════════════════════════ */
+.notif{
+  position:fixed;bottom:24px;right:24px;
+  background:var(--s2);border:1px solid var(--lime);
+  border-left:3px solid var(--lime);
+  padding:11px 18px;font-size:11px;color:var(--lime);
+  z-index:2000;animation:slideIn 0.25s ease;max-width:300px;
+}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:none;opacity:1}}
+
+/* ═══════════════════════════════════════
+   ROADMAP STEP
+═══════════════════════════════════════ */
+.roadmap-step{
+  display:grid;grid-template-columns:28px 1fr;gap:12px;
+  padding:12px 14px;background:var(--s2);border:1px solid var(--border);
+  border-left:2px solid var(--lime);margin-bottom:4px;
+}
+.roadmap-step-num{font-family:var(--display);font-size:22px;color:var(--lime);line-height:1;}
+.roadmap-step h4{font-size:13px;font-weight:700;margin-bottom:3px;}
+.roadmap-step p{font-size:11px;color:var(--muted);line-height:1.6;}
+
+/* ═══════════════════════════════════════
+   SCHEDULE TABLE
+═══════════════════════════════════════ */
+.sched-table{width:100%;border-collapse:collapse;min-width:640px;}
+.sched-table th{
+  font-size:9px;letter-spacing:0.15em;color:var(--lime);
+  padding:8px;text-align:left;border-bottom:1px solid var(--border);
+}
+.sched-table td{
+  padding:8px;vertical-align:top;
+  border-right:1px solid var(--border);min-width:90px;
+}
+.sched-block{font-size:10px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.03);color:var(--muted);}
+
+/* ═══════════════════════════════════════
+   HERO BANNER
+═══════════════════════════════════════ */
+.hero-banner{
+  background:var(--s1);border:1px solid var(--border);
+  padding:28px;margin-bottom:14px;position:relative;overflow:hidden;
+}
+.hero-banner::after{
+  content:'MALIK·OS';position:absolute;right:-10px;top:50%;
+  transform:translateY(-50%);font-family:var(--display);font-size:100px;
+  color:rgba(200,255,0,0.025);letter-spacing:0.05em;white-space:nowrap;pointer-events:none;
+}
+.hero-greeting{font-size:10px;color:var(--muted);letter-spacing:0.3em;text-transform:uppercase;margin-bottom:6px;}
+.hero-name{font-family:var(--display);font-size:clamp(28px,5vw,52px);color:var(--lime);letter-spacing:0.06em;line-height:1;}
+.hero-sub{font-size:12px;color:var(--muted);margin-top:6px;max-width:500px;line-height:1.8;}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-logo" onclick="showPage('home')" style="cursor:pointer">MALIK<span>·</span>OS</div>
+  <div class="topbar-nav">
+    <button class="nav-btn active" onclick="showPage('home')">HOME</button>
+    <button class="nav-btn" onclick="showPage('projects')">PROJECTS</button>
+    <button class="nav-btn" onclick="showPage('curiosity')">CURIOSITY</button>
+    <button class="nav-btn" onclick="showPage('quran')">QURAN</button>
+    <button class="nav-btn" onclick="showPage('gym')">GYM</button>
+    <button class="nav-btn" onclick="showPage('careers')">CAREERS</button>
+    <button class="nav-btn" onclick="showPage('hustle')">HUSTLE</button>
+    <button class="nav-btn" onclick="showPage('university')">UNI</button>
+    <button class="nav-btn" onclick="showPage('habits')">HABITS</button>
+  </div>
+  <div class="topbar-right">
+    <div id="ai-status-dot" class="status-dot live" title="AI Online via Railway"></div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:0.08em;border:1px solid var(--border2);padding:4px 10px;background:var(--s1)" id="topbar-date">—</div>
+    <div class="topbar-time" id="clock">--:--:--</div>
+  </div>
+</div>
+
+<!-- LAYOUT -->
+<div class="os-layout">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-item active" onclick="showPage('home')">🏠<span class="tip">Home Base</span></div>
+    <div class="sidebar-item" onclick="showPage('projects')">⚗️<span class="tip">Project Lab</span></div>
+    <div class="sidebar-item" onclick="showPage('curiosity')">🧮<span class="tip">Curiosity Lab</span></div>
+    <div class="sidebar-item" onclick="showPage('quran')">📖<span class="tip">Quran & Deen</span></div>
+    <div class="sidebar-item" onclick="showPage('gym')">💪<span class="tip">Physical Edge</span></div>
+    <div class="sidebar-sep"></div>
+    <div class="sidebar-item" onclick="showPage('careers')">🎯<span class="tip">Career Roadmap</span></div>
+    <div class="sidebar-item" onclick="showPage('hustle')">💸<span class="tip">Side Hustle</span></div>
+    <div class="sidebar-item" onclick="showPage('university')">🎓<span class="tip">University</span></div>
+    <div class="sidebar-item" onclick="showPage('habits')">✅<span class="tip">Habit Tracker</span></div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="main">
+
+    <!-- ══════════════════════════════
+         HOME PAGE
+    ══════════════════════════════ -->
+    <div class="page active" id="page-home">
+      <div class="hero-banner">
+        <div class="hero-greeting">// System Online — EEE Year 1 — Swansea University</div>
+        <div class="hero-name">GOOD DAY, MALIK</div>
+        <div class="hero-sub">Personal command intelligence active. 8 departments online. AI assistant standing by.</div>
+        <div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap">
+          <button class="btn btn-lime" onclick="showPage('projects')">► PROJECT LAB</button>
+          <button class="btn btn-gold" onclick="showPage('careers')">► CAREER MAP</button>
+          <button class="btn btn-teal" onclick="showPage('habits')">► HABITS</button>
+        </div>
+      </div>
+
+      <div class="grid-3" style="margin-bottom:14px">
+        <div class="stat-card"><div class="stat-val" id="home-projects">0</div><div class="stat-label">Projects Active</div></div>
+        <div class="stat-card" style="border-left-color:var(--gold)"><div class="stat-val" style="color:var(--gold)" id="home-streak">0</div><div class="stat-label">Habits Done</div></div>
+        <div class="stat-card" style="border-left-color:var(--teal)"><div class="stat-val" style="color:var(--teal)" id="home-ideas">0</div><div class="stat-label">Ideas Captured</div></div>
+      </div>
+
+      <!-- AI QUICK ASK -->
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">⚡ AI Intelligence — Ask Anything</span></div>
+        <div class="panel-body">
+          <div style="display:flex;gap:8px">
+            <input type="text" class="os-input" id="quick-q" placeholder="Ask anything... e.g. What should I build this month as a 1st year EEE student?" style="flex:1">
+            <button class="btn btn-lime" onclick="quickAsk()">ASK ►</button>
+          </div>
+          <div class="ai-box" id="quick-answer" style="min-height:60px;margin-top:12px">
+            <em style="color:var(--muted2)">Ask anything — AI is online via Railway...</em>
+          </div>
+        </div>
+      </div>
+
+
+    </div>
+
+    <!-- ══════════════════════════════
+         PROJECTS PAGE
+    ══════════════════════════════ -->
+    <div class="page" id="page-projects">
+      <div class="section-tag">Project Lab</div>
+      <h2>BUILD <span style="color:var(--lime)">SOMETHING</span></h2>
+
+      <div class="mode-toggle">
+        <button class="mode-btn active" onclick="setProjectMode('list',this)">LIST VIEW</button>
+        <button class="mode-btn" onclick="setProjectMode('mindmap',this)">MIND MAP</button>
+        <button class="mode-btn" onclick="setProjectMode('add',this)">+ ADD IDEA</button>
+      </div>
+
+      <!-- LIST VIEW -->
+      <div id="project-list-view">
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Active Projects</span>
+            <button class="btn btn-lime btn-sm" onclick="setProjectMode('add',document.querySelectorAll('.mode-btn')[2])">+ NEW PROJECT</button>
+          </div>
+          <div class="panel-body" id="projects-container">
+            <div style="color:var(--muted2);font-size:12px;text-align:center;padding:20px">No projects yet — click + NEW PROJECT to add one</div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Idea Backlog</span></div>
+          <div class="panel-body" id="ideas-container">
+            <div style="color:var(--muted2);font-size:12px;text-align:center;padding:20px">No ideas yet — use ADD IDEA to capture them</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MINDMAP VIEW -->
+      <div id="project-mindmap-view" style="display:none">
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Idea Mind Map — Tab to indent, drag to pan, scroll to zoom</span>
+            <div style="display:flex;gap:6px;align-items:center">
+              <select class="os-input" id="mindmap-saved-select" style="width:160px;font-size:10px" onchange="loadSavedMindmap()">
+                <option value="">— Load saved map —</option>
+              </select>
+              <button class="btn btn-teal btn-sm" onclick="saveMindmap()">💾 SAVE</button>
+              <button class="btn btn-orange btn-sm" onclick="deleteSavedMindmap()" title="Delete selected map">🗑</button>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center">
+              <input type="text" class="os-input" id="mindmap-name" placeholder="Map name e.g. PCB Projects..." style="flex:1;font-size:11px">
+            </div>
+            <textarea class="os-textarea" id="mindmap-text" placeholder="My Projects&#10;  LED Matrix Display&#10;    Arduino control&#10;    Bluetooth module&#10;    PCB design&#10;  Audio Spectrum Analyser&#10;    FFT algorithm&#10;    OLED display&#10;  PID Controller&#10;    Temperature sensor&#10;    Motor control" style="min-height:120px" oninput="clearTimeout(window._mmTimer);window._mmTimer=setTimeout(renderMindmap,200)" onkeydown="handleMindmapTab(event)"></textarea>
+            <div id="mindmap-canvas-wrap" class="mm-canvas" onmousedown="mmDragStart(event)" onmousemove="mmDragMove(event)" onmouseup="mmDragEnd()" onmouseleave="mmDragEnd()" onwheel="mmWheel(event)">
+              <svg id="mindmap-svg" style="display:block"></svg>
+              <!-- Google Maps-style overlay controls -->
+              <div class="mm-controls">
+                <button class="mm-ctrl-btn" onclick="mmZoom(1.25)" title="Zoom in">+</button>
+                <div class="mm-ctrl-sep"></div>
+                <button class="mm-ctrl-btn" onclick="mmZoom(0.8)" title="Zoom out">−</button>
+              </div>
+              <button class="mm-reset-btn" onclick="mmResetView()" title="Reset view">⌖</button>
+              <div class="mm-zoom-badge" id="mm-zoom-badge">100%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADD IDEA VIEW -->
+      <div id="project-add-view" style="display:none">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">⚡ Capture New Idea — AI Will Build On It</span></div>
+          <div class="panel-body">
+            <div style="margin-bottom:12px">
+              <label style="font-size:9px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase">Project Title</label>
+              <input type="text" class="os-input" id="idea-title" placeholder="e.g. Smart home energy monitor..." style="margin-top:6px" oninput="aiAutocomplete(this,'idea-title-suggest','project')">
+              <div class="ai-box" id="idea-title-suggest">Start typing for AI suggestions...</div>
+            </div>
+            <div style="margin-bottom:12px">
+              <label style="font-size:9px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase">Description & Goals</label>
+              <textarea class="os-textarea" id="idea-desc" placeholder="Describe what you want to build..." style="margin-top:6px" oninput="aiAutocomplete(this,'idea-desc-suggest','project-desc')"></textarea>
+              <div class="ai-box" id="idea-desc-suggest">Describe your idea and AI will expand on it...</div>
+            </div>
+            <div style="display:flex;gap:10px;margin-bottom:12px">
+              <div style="flex:1">
+                <label style="font-size:9px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase">Category</label>
+                <select class="os-input" id="idea-cat" style="margin-top:6px">
+                  <option value="EEE">EEE Hardware</option>
+                  <option value="AI">AI/ML</option>
+                  <option value="Software">Software</option>
+                  <option value="Business">Business</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div style="flex:1">
+                <label style="font-size:9px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase">Priority</label>
+                <select class="os-input" id="idea-priority" style="margin-top:6px">
+                  <option>High</option><option selected>Medium</option><option>Low</option>
+                </select>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-lime" onclick="saveIdea()">SAVE IDEA ►</button>
+              <button class="btn btn-gold" onclick="aiExpandIdea()">⚡ AI EXPAND IDEA</button>
+            </div>
+            <div class="ai-box" id="idea-expand-result" style="margin-top:12px;min-height:80px;display:none"></div>
+            <div style="margin-top:8px" id="idea-save-ai-row" style="display:none">
+              <button class="btn btn-teal btn-sm" onclick="saveAISuggestionAsIdea()">💾 SAVE AI SUGGESTION AS IDEA</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════
+         CURIOSITY LAB
+    ══════════════════════════════ -->
+    <div class="page" id="page-curiosity">
+      <div class="section-tag">Curiosity Lab</div>
+      <h2>AI LEARNING <span style="color:var(--lime)">ASSISTANT</span></h2>
+
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">🧠 AI Study Buddy — Explain Anything</span></div>
+        <div class="panel-body">
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <input type="text" class="os-input" id="study-q" placeholder="e.g. Explain the Fourier Transform intuitively..." style="flex:1">
+            <select class="os-input" id="study-level" style="width:130px">
+              <option>ELI5</option><option selected>Student</option><option>Deep Dive</option>
+            </select>
+            <button class="btn btn-lime" onclick="studyExplain()">EXPLAIN ►</button>
+          </div>
+          <div class="ai-box" id="study-answer" style="min-height:100px">Ask anything — concepts, intuition, applications, maths behind it...</div>
+          <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+            <input type="text" class="os-input" id="concept-save-name" placeholder="Concept name to save..." style="flex:1;font-size:11px">
+            <button class="btn btn-teal btn-sm" onclick="saveConceptNote()">💾 SAVE TO CONCEPTS</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">📚 Saved Concepts</span>
+          <button class="btn btn-lime btn-sm" onclick="toggleSavedConcepts()">SHOW/HIDE</button>
+        </div>
+        <div id="saved-concepts-container" style="display:none;padding:14px"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">🗺️ AI/ML Learning Pathway</span></div>
+        <div class="panel-body">
+          <div style="display:flex;flex-direction:column;gap:3px" id="ml-pathway"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">📝 Smart Notes — AI Autocomplete</span>
+          <div style="display:flex;gap:6px">
+            <select class="os-input" id="notes-slot-select" style="width:170px;font-size:10px" onchange="loadNoteSlot()">
+              <option value="">— Load saved note —</option>
+            </select>
+            <button class="btn btn-teal btn-sm" onclick="saveSmartNotes()">💾 SAVE</button>
+            <button class="btn btn-orange btn-sm" onclick="deleteNoteSlot()">🗑</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <input type="text" class="os-input" id="notes-save-name" placeholder="Note title e.g. Fourier Transform notes..." style="margin-bottom:8px;font-size:11px">
+          <div class="os-textarea" id="notes-area" contenteditable="true" style="min-height:160px;white-space:pre-wrap;line-height:1.8" oninput="notesAutocomplete()"></div>
+          <div class="ai-box" id="notes-suggest">Start writing — AI autocomplete will activate...</div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn btn-lime" onclick="acceptSuggestion()">ACCEPT SUGGESTION (Tab)</button>
+            <button class="btn btn-gold" onclick="expandNotes()">⚡ EXPAND WITH AI</button>
+            <button class="btn btn-violet btn-sm" onclick="newSmartNote()">➕ NEW NOTE</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════
+         QURAN PAGE
+    ══════════════════════════════ -->
+    <div class="page" id="page-quran">
+      <div class="section-tag">Quran & Deen</div>
+      <h2>سبق · <span style="color:var(--lime)">سبقي</span> · منزل</h2>
+
+      <div class="quran-grid">
+        <div class="quran-card">
+          <div class="quran-arabic">سبق</div>
+          <div class="quran-label">SABAQ — NEW LESSON</div>
+          <div class="quran-counter" id="sabaq-count">0</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:3px">pages today</div>
+          <div class="quran-btn-row">
+            <button class="counter-btn" onclick="changeCount('sabaq',-1)">−</button>
+            <button class="counter-btn" onclick="changeCount('sabaq',1)">+</button>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:12px;line-height:1.7">New memorisation. Morning, after Fajr. Repeat each ayah until fluent.</div>
+        </div>
+        <div class="quran-card">
+          <div class="quran-arabic">سبقي</div>
+          <div class="quran-label">SABQI — RECENT REVISION</div>
+          <div class="quran-counter" id="sabqi-count">0</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:3px">pages revised</div>
+          <div class="quran-btn-row">
+            <button class="counter-btn" onclick="changeCount('sabqi',-1)">−</button>
+            <button class="counter-btn" onclick="changeCount('sabqi',1)">+</button>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:12px;line-height:1.7">Last 7 days of new memorisation. 10–15 mins. Flag pages you stumble on.</div>
+        </div>
+        <div class="quran-card">
+          <div class="quran-arabic">منزل</div>
+          <div class="quran-label">MANZIL — OLD REVISION</div>
+          <div class="quran-counter" id="manzil-count">0</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:3px">pages covered</div>
+          <div class="quran-btn-row">
+            <button class="counter-btn" onclick="changeCount('manzil',-1)">−</button>
+            <button class="counter-btn" onclick="changeCount('manzil',1)">+</button>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:12px;line-height:1.7">1/7th of total hifz daily. Cover full memorisation in one week.</div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:14px">
+        <div class="panel-header"><span class="panel-title">📖 Daily Tilawah Tracker</span></div>
+        <div class="panel-body">
+          <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+            <div>
+              <div style="font-size:9px;color:var(--muted);letter-spacing:0.2em;text-transform:uppercase;margin-bottom:6px">Juz Read Today</div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <button class="counter-btn" onclick="changeCount('tilawah',-1)">−</button>
+                <span style="font-family:var(--display);font-size:40px;color:var(--gold)" id="tilawah-count">0</span>
+                <button class="counter-btn" onclick="changeCount('tilawah',1)">+</button>
+                <span style="font-size:11px;color:var(--muted)">/ 0.5 Juz target</span>
+              </div>
+            </div>
+            <div style="flex:1;min-width:220px">
+              <div style="font-size:9px;color:var(--muted);letter-spacing:0.2em;text-transform:uppercase;margin-bottom:6px">Weekly Hifz Log</div>
+              <textarea class="os-textarea" id="hifz-log" placeholder="Log your hifz progress, notes on difficult ayat..." style="min-height:70px"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HIFZ PROGRESS TRACKER -->
+      <div class="panel" style="margin-top:14px">
+        <div class="panel-header">
+          <span class="panel-title">📋 Hifz Progress — Quran Memorisation</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span style="font-family:var(--display);font-size:18px;color:var(--lime)" id="hifz-pct">0%</span>
+            <span style="font-size:10px;color:var(--muted)" id="hifz-count">0/114 Surahs</span>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div style="height:14px;background:var(--s1);border:1px solid var(--border);border-radius:7px;overflow:hidden;margin-bottom:14px">
+            <div id="hifz-bar" style="height:100%;background:linear-gradient(90deg,var(--lime),var(--gold));border-radius:7px;transition:width 0.5s ease;width:0%"></div>
+          </div>
+          <div style="font-size:9px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Select memorised surahs:</div>
+          <div id="hifz-surah-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px;max-height:260px;overflow-y:auto;padding-right:6px"></div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn btn-lime btn-sm" onclick="selectAllSurahs()">SELECT ALL</button>
+            <button class="btn btn-orange btn-sm" onclick="clearAllSurahs()">CLEAR ALL</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════
+         GYM PAGE
+    ══════════════════════════════ -->
+    <div class="page" id="page-gym">
+      <div class="section-tag">Physical Edge</div>
+      <h2>YOUR <span style="color:var(--lime)">SPLIT</span></h2>
+
+      <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
+        <button class="btn btn-lime btn-sm" onclick="showGymDay(1)">DAY 1 — CHEST/BACK/BICEPS</button>
+        <button class="btn btn-lime btn-sm" onclick="showGymDay(2)">DAY 2 — SHOULDERS/LEGS/TRIS</button>
+        <button class="btn btn-lime btn-sm" onclick="showGymDay(3)">DAY 3 — CHEST/BACK/BICEPS</button>
+        <button class="btn btn-lime btn-sm" onclick="showGymDay(4)">DAY 4 — SHOULDERS/LEGS/TRIS</button>
+        <button class="btn btn-violet btn-sm" onclick="toggleEditGymTargets()" id="gym-edit-targets-btn">✏ EDIT TARGETS</button>
+      </div>
+      <div class="panel" id="gym-day-panel">
+        <div class="panel-header"><span class="panel-title" id="gym-day-title">SELECT A DAY ABOVE</span></div>
+        <div class="panel-body">
+          <table class="gym-table" id="gym-table"></table>
+          <div style="margin-top:14px;display:flex;gap:8px">
+            <button class="btn btn-teal" onclick="logGymSession()">✓ LOG SESSION</button>
+            <button class="btn btn-gold" onclick="aiGymAdvice()">⚡ AI COACH</button>
+          </div>
+          <div class="ai-box" id="gym-advice" style="margin-top:12px;display:none"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Session Log</span></div>
+        <div class="panel-body" id="gym-log">
+          <div style="color:var(--muted2);font-size:12px">No sessions logged yet.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">📈 Weight Progress — Per Exercise</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select class="os-input" id="chart-exercise" style="width:220px;font-size:10px" onchange="renderProgressChart()"></select>
+          </div>
+        </div>
+        <div class="panel-body" style="padding:10px 18px 18px">
+          <div id="gym-chart-wrap">
+            <div style="color:var(--muted2);font-size:12px;text-align:center;padding:30px">Log a session to start tracking weight progress</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════
+         CAREERS PAGE
+    ══════════════════════════════ -->
+    <div class="page" id="page-careers">
+      <div class="section-tag">Career Roadmap</div>
+      <h2>EEE <span style="color:var(--lime)">PATHWAYS</span></h2>
+
+      <div class="mode-toggle" style="margin-bottom:14px">
+        <button class="mode-btn active" onclick="setCareerView('grid',this)">GRID VIEW</button>
+        <button class="mode-btn" onclick="setCareerView('tree',this)">TREE MAP</button>
+      </div>
+
+      <div id="careers-grid-view">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Select Your Career Path — AI Builds Your Roadmap</span></div>
+          <div class="panel-body">
+            <div class="career-list" id="career-list-container"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="careers-tree-view" style="display:none">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">EEE Career Tree — Salary · Skills · Overlap</span></div>
+          <div class="panel-body" style="padding:10px">
+            <svg id="career-tree-svg" style="width:100%;min-height:500px;background:var(--s2);border:1px solid var(--border);display:block"></svg>
+          </div>
+        </div>
+      </div>
+
+      <div id="career-detail-view" class="career-detail">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+          <button class="btn btn-lime btn-sm" onclick="backToCareers()">◄ BACK</button>
+          <div style="font-family:var(--display);font-size:18px;color:var(--lime);letter-spacing:0.06em" id="career-detail-title"></div>
+        </div>
+        <div id="career-detail-content"></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════
+         HUSTLE PAGE
+    ══════════════════════════════ -->
+    <div class="page" id="page-hustle">
+      <div class="section-tag">Side Hustle Lab</div>
+      <h2>BUILD YOUR <span style="color:var(--lime)">INCOME</span></h2>
+
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">⚡ Hustle Idea Generator — AI Powered</span></div>
+        <div class="panel-body">
+          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+            <input type="text" class="os-input" id="hustle-skill" placeholder="Your skills e.g. Arduino, Python, Circuit design..." style="flex:1">
+            <input type="text" class="os-input" id="hustle-time" placeholder="Time e.g. 5 hrs/week" style="width:160px">
+            <button class="btn btn-gold" onclick="generateHustleIdeas()">GENERATE ►</button>
+          </div>
+          <div class="ai-box" id="hustle-ideas" style="min-height:110px">Enter your skills and available time, then generate personalised hustle ideas...</div>
+          <div style="margin-top:8px">
+            <button class="btn btn-teal btn-sm" onclick="saveHustleIdeas()">💾 SAVE THESE IDEAS</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">💾 Saved Hustle Ideas</span></div>
+        <div class="panel-body" id="saved-hustle-container">
+          <div style="color:var(--muted2);font-size:12px;text-align:center;padding:10px">No saved ideas yet</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">🔬 Business Idea Analyser — Cost · Scalability · Viability</span></div>
+        <div class="panel-body">
+          <div style="margin-bottom:10px;font-size:11px;color:var(--muted)">Describe any business idea and get a full AI report — estimated costs, revenue model, scalability ceiling, risks, and your EEE advantage.</div>
+          <textarea class="os-textarea" id="business-idea-input" placeholder="e.g. A subscription SaaS tool that helps EEE students track their lab sessions and auto-generates lab reports using AI..." style="min-height:90px"></textarea>
+          <div style="margin-top:10px">
+            <button class="btn btn-violet" onclick="analyseBusinessIdea()">⚡ ANALYSE IDEA</button>
+          </div>
+          <div class="ai-box" id="business-analysis" style="margin-top:12px;min-height:80px;display:none"></div>
+          <div style="margin-top:8px">
+            <button class="btn btn-teal btn-sm" onclick="saveBusinessAnalysis()">💾 SAVE ANALYSIS</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Q2 2026 — Active Exploration</span></div>
+        <div class="panel-body" id="hustle-active"></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════
+         UNIVERSITY PAGE
+    ══════════════════════════════ -->
+    <div class="page" id="page-university">
+      <div class="section-tag">University Core</div>
+      <h2>GRADE <span style="color:var(--lime)">CALCULATOR</span></h2>
+
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="stat-card"><div class="stat-val" id="overall-grade" style="font-size:28px">—</div><div class="stat-label">Overall Year Grade</div></div>
+        <div class="stat-card" style="border-left-color:var(--teal)"><div class="stat-val" style="color:var(--teal);font-size:28px" id="overall-class">—</div><div class="stat-label">Degree Class</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Add Module</span>
+          <button class="btn btn-lime btn-sm" onclick="showAddModule()">+ ADD MODULE</button>
+        </div>
+        <div class="panel-body" id="add-module-form" style="display:none">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+            <input type="text" class="os-input" id="mod-name" placeholder="Module name e.g. Circuit Theory" style="flex:2;min-width:180px">
+            <input type="number" class="os-input" id="mod-credits" placeholder="Credits e.g. 10" style="width:100px">
+            <button class="btn btn-teal btn-sm" onclick="addModule()">ADD</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="modules-container"></div>
+    </div>
+
+    <!-- ══════════════════════════════
+         HABITS PAGE
+    ══════════════════════════════ -->
+    <div class="page" id="page-habits">
+      <div class="section-tag">Habit Tracker</div>
+      <h2>THIS <span style="color:var(--lime)">WEEK</span></h2>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title" id="habits-week-title">Daily Habits — This Week</span>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-teal btn-sm" onclick="logWeek()">📋 LOG WEEK</button>
+            <button class="btn btn-lime btn-sm" onclick="resetHabits()">RESET WEEK</button>
+          </div>
+        </div>
+        <div class="panel-body" id="habits-container"></div>
+        <div id="habits-log-container" style="padding:0 18px 18px"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">📈 Weekly Habit Performance — Line Diagram</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select class="os-input" id="habit-chart-select" style="width:200px;font-size:10px" onchange="renderHabitChart()">
+              <option value="all">All Habits (Mean %)</option>
+            </select>
+            <button class="btn btn-orange btn-sm" onclick="clearHabitGraph()">🗑 CLEAR GRAPH</button>
+          </div>
+        </div>
+        <div class="panel-body" style="padding:10px 18px 18px">
+          <div id="habit-chart-wrap">
+            <div style="color:var(--muted2);font-size:12px;text-align:center;padding:30px">Log weeks to see your habit performance trend</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /os-layout -->
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// MALIK OS — Frontend v4  |  Wired to Node.js backend on Railway
+// ═══════════════════════════════════════════════════════════════════
+
+// ── CONFIG ────────────────────────────────────────────────────────
+// Set this to your Railway backend URL after deploying
+const API = 'https://malik-os-backend-production.up.railway.app';
+
+// ── API HELPER ────────────────────────────────────────────────────
+async function api(method, path, body) {
+  try {
+    const opts = {
+      method,
+      headers: { 'Content-Type': 'application/json' }
+    };
+    if(body) opts.body = JSON.stringify(body);
+    const res = await fetch(API + path, opts);
+    if(!res.ok) {
+      const err = await res.text();
+      throw new Error(err);
+    }
+    return res.json();
+  } catch(e) {
+    // Only log if backend has been configured (not the placeholder URL)
+    if(!API.includes('malik-os-backend.up.railway.app') || !e.message.includes('fetch')) {
+      console.warn('API:', path, e.message);
+    }
+    throw e;
+  }
+}
+
+// ── CLOCK ────────────────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('en-GB');
+  const dateEl = document.getElementById('topbar-date');
+  if(dateEl) {
+    const days = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+    const d = String(now.getDate()).padStart(2,'0');
+    const m = String(now.getMonth()+1).padStart(2,'0');
+    const y = now.getFullYear();
+    dateEl.textContent = days[now.getDay()] + ' // ' + d + '.' + m + '.' + y;
+  }
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── GREETING (time-based) ────────────────────────────────────────
+function getGreeting() {
+  const h = new Date().getHours();
+  if(h >= 4  && h < 12) return 'Good Morning, Malik';
+  if(h >= 12 && h < 17) return 'Good Afternoon, Malik';
+  if(h >= 17 && h < 21) return 'Good Evening, Malik';
+  return 'Still Up, Malik?';
+}
+const greetEl = document.querySelector('.hero-name');
+if(greetEl) greetEl.textContent = getGreeting();
+
+// ── NAVIGATION ───────────────────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.sidebar-item').forEach(s => s.classList.remove('active'));
+  const page = document.getElementById('page-' + id);
+  if(!page) return;
+  page.classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    if(b.textContent.trim().toLowerCase() === id.toLowerCase() ||
+       b.getAttribute('onclick') === "showPage('" + id + "')")
+      b.classList.add('active');
+  });
+  document.querySelectorAll('.sidebar-item').forEach(s => {
+    if((s.getAttribute('onclick') || '').includes("'" + id + "'"))
+      s.classList.add('active');
+  });
+  updateStats();
+}
+
+// ── NOTIFICATIONS ────────────────────────────────────────────────
+function showNotif(msg, type) {
+  const ex = document.querySelector('.notif');
+  if(ex) ex.remove();
+  const n = document.createElement('div');
+  n.className = 'notif';
+  const col = type === 'error' ? 'var(--orange)' : 'var(--lime)';
+  n.style.borderColor = col;
+  n.style.borderLeftColor = col;
+  n.innerHTML = '<span style="color:' + col + '">■</span> ' + msg;
+  document.body.appendChild(n);
+  setTimeout(() => n.remove(), 3500);
+}
+
+// ── AI HELPER ────────────────────────────────────────────────────
+async function askAI(endpoint, payload, outputEl) {
+  if(outputEl) {
+    outputEl.innerHTML = '<span class="spinner"></span> AI thinking...';
+    outputEl.className = 'ai-box loading';
+  }
+  try {
+    const data = await api('POST', endpoint, payload);
+    if(outputEl) {
+      outputEl.innerHTML = data.text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      outputEl.className = 'ai-box';
+    }
+    return data.text;
+  } catch(e) {
+    const msg = 'AI Error: ' + e.message + '. Make sure the backend is deployed on Railway.';
+    if(outputEl) { outputEl.innerHTML = msg; outputEl.className = 'ai-box'; }
+    return msg;
+  }
+}
+
+// ── SCHEDULE ─────────────────────────────────────────────────────
+function buildSchedule() {
+  const days = ['Sat','Sun','Mon','Tue','Wed','Thu','Fri'];
+  const s = {
+    Sat: ['🕌 Sabaq (7am)','⚗️ Project Lab (9am)','🧮 Curiosity (12pm)','💪 Gym D4 (2pm)','💸 Hustle (5pm)'],
+    Sun: ['📖 Manzil (9am)','🎓 Uni catch-up (11am)','⚗️ Projects (3pm)','🔁 Weekly Review (6pm)','📅 Plan week (7pm)'],
+    Mon: ['🕌 Sabaq (7am)','🎓 Lectures (9am)','🎓 Uni review (2pm)','💪 Gym D1 (5pm)','⚗️ Project (8pm)'],
+    Tue: ['🕌 Sabqi (7am)','🎓 Lectures (9am)','🧮 Curiosity (2pm)','🥊 Sport (5pm)','📖 Tilawah (9pm)'],
+    Wed: ['🕌 Sabaq (7am)','🎓 Lectures (9am)','⚗️ Projects (2pm)','💪 Gym D2 (5pm)','🎓 Problems (8pm)'],
+    Thu: ['🕌 Sabqi (7am)','🎓 Lectures (9am)','🥊 Sport (2pm)','🧮 Curiosity (5pm)','📖 Tilawah (9pm)'],
+    Fri: ['🕌 Sabaq (7am)','🎓 Light review','🕌 Jumu\u02bcah (1pm)','💪 Gym/Rest (4pm)','🌙 Protected eve']
+  };
+  const t = document.getElementById('sched-table');
+  if(!t) return;
+  const todayMap = {0:'Sun',1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri',6:'Sat'};
+  const today = todayMap[new Date().getDay()];
+  t.innerHTML = '<tr>' + days.map(d =>
+    '<th style="color:' + (d===today?'var(--lime)':'var(--muted)') + '">' + d + (d===today?' ★':'') + '</th>'
+  ).join('') + '</tr><tr>' + days.map(d =>
+    '<td>' + s[d].map(x => '<div class="sched-block">' + x + '</div>').join('') + '</td>'
+  ).join('') + '</tr>';
+}
+
+// ── HOME QUICK ASK ───────────────────────────────────────────────
+async function quickAsk() {
+  const q = document.getElementById('quick-q').value.trim();
+  if(!q) return;
+  const el = document.getElementById('quick-answer');
+  await askAI('/api/ai/ask', { prompt: q, maxTokens: 600 }, el);
+}
+document.addEventListener('keydown', e => {
+  if(e.key === 'Enter' && document.activeElement?.id === 'quick-q') quickAsk();
+});
+
+// ── PROJECT MODES ────────────────────────────────────────────────
+function setProjectMode(mode, btn) {
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('project-list-view').style.display  = mode==='list'    ? 'block':'none';
+  document.getElementById('project-mindmap-view').style.display = mode==='mindmap'? 'block':'none';
+  document.getElementById('project-add-view').style.display   = mode==='add'     ? 'block':'none';
+  if(mode === 'mindmap') setTimeout(renderMindmap, 50);
+}
+
+// ── MINDMAP — TAB KEY FIX ────────────────────────────────────────
+function handleMindmapTab(e) {
+  if(e.key !== 'Tab') return;
+  e.preventDefault();
+  const ta = e.target;
+  const start = ta.selectionStart;
+  const end = ta.selectionEnd;
+  ta.value = ta.value.substring(0, start) + '  ' + ta.value.substring(end);
+  ta.selectionStart = ta.selectionEnd = start + 2;
+  clearTimeout(window._mmTimer);
+  window._mmTimer = setTimeout(renderMindmap, 200);
+}
+
+// ── MINDMAP STATE ───────────────────────────────────────────────
+let mmScale = 1, mmPanX = 0, mmPanY = 0;
+let mmTargetScale = 1, mmTargetPanX = 0, mmTargetPanY = 0;
+let mmDragging = false, mmLastX = 0, mmLastY = 0;
+let mmFullW = 900, mmFullH = 560;
+let mmAnimFrame = null;
+
+function mmZoom(factor) {
+  const wrap = document.getElementById('mindmap-canvas-wrap');
+  if(!wrap) return;
+  const rect = wrap.getBoundingClientRect();
+  const cx = rect.width / 2;
+  const cy = rect.height / 2;
+  const oldScale = mmTargetScale;
+  mmTargetScale = Math.min(4, Math.max(0.2, mmTargetScale * factor));
+  // Zoom towards center of viewport
+  const ratio = mmTargetScale / oldScale;
+  mmTargetPanX = cx - ratio * (cx - mmTargetPanX);
+  mmTargetPanY = cy - ratio * (cy - mmTargetPanY);
+  mmAnimateToTarget();
+  updateZoomBadge();
+}
+function mmResetView() {
+  mmTargetScale=1; mmTargetPanX=0; mmTargetPanY=0;
+  mmAnimateToTarget();
+  updateZoomBadge();
+}
+function updateZoomBadge() {
+  const badge = document.getElementById('mm-zoom-badge');
+  if(badge) {
+    badge.textContent = Math.round(mmTargetScale * 100) + '%';
+    badge.style.opacity = '1';
+    clearTimeout(window._mmBadgeTimer);
+    window._mmBadgeTimer = setTimeout(() => { badge.style.opacity = '0.4'; }, 1500);
+  }
+}
+function mmAnimateToTarget() {
+  if(mmAnimFrame) cancelAnimationFrame(mmAnimFrame);
+  const ease = 0.18;
+  function step() {
+    const ds = mmTargetScale - mmScale;
+    const dx = mmTargetPanX - mmPanX;
+    const dy = mmTargetPanY - mmPanY;
+    if(Math.abs(ds) < 0.001 && Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) {
+      mmScale = mmTargetScale;
+      mmPanX = mmTargetPanX;
+      mmPanY = mmTargetPanY;
+      applyMmTransform();
+      mmAnimFrame = null;
+      return;
+    }
+    mmScale += ds * ease;
+    mmPanX += dx * ease;
+    mmPanY += dy * ease;
+    applyMmTransform();
+    mmAnimFrame = requestAnimationFrame(step);
+  }
+  step();
+}
+function applyMmTransform() {
+  const svg = document.getElementById('mindmap-svg');
+  if(svg) svg.style.transform = 'translate('+mmPanX+'px,'+mmPanY+'px) scale('+mmScale+')';
+}
+function mmDragStart(e) {
+  if(e.target.closest('.mm-controls') || e.target.closest('.mm-reset-btn')) return;
+  mmDragging = true; mmLastX = e.clientX; mmLastY = e.clientY;
+  if(mmAnimFrame) { cancelAnimationFrame(mmAnimFrame); mmAnimFrame = null; }
+  mmTargetPanX = mmPanX; mmTargetPanY = mmPanY; mmTargetScale = mmScale;
+  const wrap = document.getElementById('mindmap-canvas-wrap');
+  if(wrap) wrap.classList.add('grabbing');
+}
+function mmDragMove(e) {
+  if(!mmDragging) return;
+  const dx = e.clientX - mmLastX;
+  const dy = e.clientY - mmLastY;
+  mmPanX += dx; mmPanY += dy;
+  mmTargetPanX = mmPanX; mmTargetPanY = mmPanY;
+  mmLastX = e.clientX; mmLastY = e.clientY;
+  applyMmTransform();
+}
+function mmDragEnd() {
+  mmDragging = false;
+  const wrap = document.getElementById('mindmap-canvas-wrap');
+  if(wrap) wrap.classList.remove('grabbing');
+}
+function mmWheel(e) {
+  e.preventDefault();
+  const wrap = document.getElementById('mindmap-canvas-wrap');
+  if(!wrap) return;
+  const rect = wrap.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const oldScale = mmTargetScale;
+  const factor = e.deltaY < 0 ? 1.12 : 0.89;
+  mmTargetScale = Math.min(4, Math.max(0.2, mmTargetScale * factor));
+  // Zoom towards mouse pointer
+  const ratio = mmTargetScale / oldScale;
+  mmTargetPanX = mx - ratio * (mx - mmTargetPanX);
+  mmTargetPanY = my - ratio * (my - mmTargetPanY);
+  mmAnimateToTarget();
+  updateZoomBadge();
+}
+
+// ── MINDMAP RENDERER ────────────────────────────────────────────
+function renderMindmap() {
+  const textarea = document.getElementById('mindmap-text');
+  const svg = document.getElementById('mindmap-svg');
+  const wrap = document.getElementById('mindmap-canvas-wrap');
+  if(!textarea || !svg || !wrap) return;
+  const text = textarea.value.trim();
+  if(!text) { svg.innerHTML = ''; return; }
+
+  // Parse indented text into tree
+  const lines = text.split('\n');
+  const roots = [];
+  const stack = [];
+  lines.forEach(line => {
+    if(!line.trim()) return;
+    const indent = line.match(/^(\s*)/)[1].length;
+    const level = Math.floor(indent / 2);
+    const node = { text: line.trim(), level, children: [] };
+    stack[level] = node;
+    if(level === 0) roots.push(node);
+    else if(stack[level-1]) stack[level-1].children.push(node);
+    stack.splice(level + 1);
+  });
+  if(!roots.length) { svg.innerHTML = ''; return; }
+
+  // Calculate layout dimensions dynamically
+  function countDepth(node) { return node.children.length ? 1 + Math.max(...node.children.map(countDepth)) : 0; }
+  function countLeaves(node) { return node.children.length ? node.children.reduce((s,c) => s+countLeaves(c), 0) : 1; }
+  const maxDepth = Math.max(...roots.map(countDepth));
+  const totalLeaves = roots.reduce((s,r) => s+countLeaves(r), 0);
+  const W = Math.max(wrap.getBoundingClientRect().width - 4 || 800, (maxDepth+1)*180 + 100);
+  const H = Math.max(Math.max(520, totalLeaves * 80), roots.length * 120);
+  mmFullW = W; mmFullH = H;
+
+  const colors = ['#c8ff00','#fbbf24','#00e5cc','#8b5cf6','#ff5500','#ff3d7f','#38bdf8','#00ff88'];
+  // Draw lines FIRST in a separate layer, then circles on top — fixes lines through circles
+  let linesPieces = [];
+  let nodesPieces = [];
+
+  function wrapText(txt, maxChars) {
+    const words = txt.split(' ');
+    const ls = []; let cur = '';
+    words.forEach(w => {
+      if((cur+(cur?' ':'')+w).length > maxChars && cur) { ls.push(cur); cur = w; }
+      else cur += (cur?' ':'')+w;
+    });
+    if(cur) ls.push(cur);
+    return ls.slice(0,3);
+  }
+
+  function layoutNode(node, x, y, ci, depth) {
+    node._x = x; node._y = y; node._ci = ci; node._depth = depth;
+    if(node.children.length) {
+      const childX = x + (depth===0?160:130);
+      const leavesPerChild = node.children.map(countLeaves);
+      const totalL = leavesPerChild.reduce((a,b)=>a+b,0);
+      const spreadH = Math.min(totalL * 75, H * 0.85);
+      let curY = y - spreadH/2;
+      node.children.forEach((ch,i) => {
+        const childH = (leavesPerChild[i]/totalL)*spreadH;
+        layoutNode(ch, childX, curY + childH/2, ci+i+1, depth+1);
+        curY += childH;
+      });
+    }
+  }
+
+  function drawLines(node) {
+    if(!node.children.length) return;
+    const col = colors[node._ci % colors.length];
+    node.children.forEach(ch => {
+      const dash = node._depth >= 1 ? 'stroke-dasharray="6,4"' : '';
+      const sw = node._depth===0?2:1;
+      // Line stops at the EDGE of parent circle, not centre — fixes overlap
+      const pr = node._depth===0?38:node._depth===1?26:18;
+      const cr = ch._depth===0?38:ch._depth===1?26:18;
+      const dx = ch._x - node._x, dy = ch._y - node._y;
+      const dist = Math.sqrt(dx*dx+dy*dy) || 1;
+      const x1 = node._x + (dx/dist)*pr;
+      const y1 = node._y + (dy/dist)*pr;
+      const x2 = ch._x - (dx/dist)*cr;
+      const y2 = ch._y - (dy/dist)*cr;
+      linesPieces.push('<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+col+'" stroke-width="'+sw+'" stroke-opacity="0.45" '+dash+'/>');
+      drawLines(ch);
+    });
+  }
+
+  function drawCircles(node) {
+    const col = colors[node._ci % colors.length];
+    const r = node._depth===0?38:node._depth===1?26:18;
+    const fs = node._depth===0?11:node._depth===1?10:9;
+    // Filled background circle to mask any residual line behind it
+    nodesPieces.push('<circle cx="'+node._x+'" cy="'+node._y+'" r="'+r+'" fill="#0e0e12"/>');
+    nodesPieces.push('<circle cx="'+node._x+'" cy="'+node._y+'" r="'+r+'" fill="'+col+'18" stroke="'+col+'" stroke-width="'+(node._depth===0?2:1)+'"/>');
+    const tls = wrapText(node.text, node._depth===0?10:13);
+    const lineH = fs+3;
+    tls.forEach((ln,i) => {
+      const ty = node._y - (tls.length*lineH)/2 + i*lineH + fs;
+      nodesPieces.push('<text x="'+node._x+'" y="'+ty+'" text-anchor="middle" font-family="Space Mono,monospace" font-size="'+fs+'" font-weight="700" fill="'+col+'">'+ln+'</text>');
+    });
+    node.children.forEach(ch => drawCircles(ch));
+  }
+
+  // Layout all nodes
+  const rowH = H / (roots.length + 1);
+  roots.forEach((root,i) => layoutNode(root, 70, (i+1)*rowH, i*3, 0));
+  // Draw lines first (behind), then circles on top
+  roots.forEach(r => drawLines(r));
+  roots.forEach(r => drawCircles(r));
+
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  svg.setAttribute('width',W);
+  svg.setAttribute('height',H);
+  svg.style.transformOrigin = '0 0';
+  // Grid pattern for the SVG background
+  const gridPattern = '<defs><pattern id="mm-grid" width="24" height="24" patternUnits="userSpaceOnUse">' +
+    '<circle cx="12" cy="12" r="0.8" fill="rgba(200,255,0,0.06)"/>' +
+    '</pattern></defs>';
+  svg.innerHTML = gridPattern +
+    '<rect width="'+W+'" height="'+H+'" fill="#12121a" rx="0"/>' +
+    '<rect width="'+W+'" height="'+H+'" fill="url(#mm-grid)"/>' +
+    linesPieces.join('') + nodesPieces.join('');
+  applyMmTransform();
+
+  // Set wrap height
+  const wrapH = Math.min(Math.max(400, H*mmScale), window.innerHeight * 0.6);
+  wrap.style.height = wrapH + 'px';
+}
+
+window.addEventListener('resize', () => {
+  const mv = document.getElementById('project-mindmap-view');
+  if(mv && mv.style.display !== 'none') renderMindmap();
+});
+
+// ── MINDMAP SAVE/LOAD ────────────────────────────────────────────
+function getMindmaps() { return JSON.parse(localStorage.getItem('malik-mindmaps') || '{}'); }
+function saveMindmaps(maps) { localStorage.setItem('malik-mindmaps', JSON.stringify(maps)); }
+
+function saveMindmap() {
+  const name = document.getElementById('mindmap-name').value.trim() || 'Untitled ' + new Date().toLocaleDateString('en-GB');
+  const text = document.getElementById('mindmap-text').value.trim();
+  if(!text) { showNotif('Nothing to save'); return; }
+  const maps = getMindmaps();
+  maps[name] = text;
+  saveMindmaps(maps);
+  populateMindmapSelect();
+  showNotif('Mindmap saved: ' + name);
+}
+
+function loadSavedMindmap() {
+  const sel = document.getElementById('mindmap-saved-select').value;
+  if(!sel) return;
+  const maps = getMindmaps();
+  if(maps[sel]) {
+    document.getElementById('mindmap-text').value = maps[sel];
+    document.getElementById('mindmap-name').value = sel;
+    mmResetView();
+    renderMindmap();
+    showNotif('Loaded: ' + sel);
+  }
+}
+
+function deleteSavedMindmap() {
+  const sel = document.getElementById('mindmap-saved-select').value;
+  if(!sel) { showNotif('Select a map to delete'); return; }
+  const maps = getMindmaps();
+  delete maps[sel];
+  saveMindmaps(maps);
+  populateMindmapSelect();
+  showNotif('Deleted: ' + sel);
+}
+
+function populateMindmapSelect() {
+  const sel = document.getElementById('mindmap-saved-select');
+  if(!sel) return;
+  const maps = getMindmaps();
+  const keys = Object.keys(maps);
+  sel.innerHTML = '<option value="">— Load saved map —</option>' +
+    keys.map(k => '<option value="'+k+'">'+k+'</option>').join('');
+}
+
+// ── AI AUTOCOMPLETE ──────────────────────────────────────────────
+let _acTimer = null;
+function aiAutocomplete(el, targetId, ctx) {
+  clearTimeout(_acTimer);
+  const val = el.value.trim();
+  const out = document.getElementById(targetId);
+  if(!out) return;
+  if(val.length < 10) { out.innerHTML = 'Keep typing for AI suggestions...'; return; }
+  out.innerHTML = '<span class="spinner"></span> AI thinking...';
+  _acTimer = setTimeout(() => askAI('/api/ai/project-autocomplete', { text: val, context: ctx }, out), 1200);
+}
+
+let _ntTimer = null;
+function getNotesText() {
+  const el = document.getElementById('notes-area');
+  return el ? el.innerText || el.textContent || '' : '';
+}
+function notesAutocomplete() {
+  clearTimeout(_ntTimer);
+  const val = getNotesText();
+  const lastLine = val.split('\n').filter(l => l.trim()).pop() || '';
+  if(lastLine.length < 15) return;
+  const out = document.getElementById('notes-suggest');
+  out.innerHTML = '<span class="spinner"></span> Suggesting...';
+  _ntTimer = setTimeout(async () => {
+    const data = await api('POST', '/api/ai/notes-complete', { lastLine });
+    out.innerHTML = '→ ' + data.text;
+    out.className = 'ai-box';
+    window._lastSug = data.text;
+  }, 1500);
+}
+function acceptSuggestion() {
+  if(window._lastSug) {
+    const el = document.getElementById('notes-area');
+    // Insert AI text highlighted in teal so user can identify it later
+    const aiSpan = document.createElement('span');
+    aiSpan.style.cssText = 'color:#00e5cc;border-left:2px solid #00e5cc;padding-left:6px;margin-left:4px';
+    aiSpan.textContent = ' ' + window._lastSug;
+    aiSpan.className = 'ai-inserted';
+    el.appendChild(aiSpan);
+    // Move cursor to end
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    window._lastSug = null;
+    document.getElementById('notes-suggest').innerHTML = 'Suggestion accepted. Keep writing...';
+  }
+}
+async function expandNotes() {
+  const notes = getNotesText().trim();
+  if(!notes) { showNotif('Write some notes first'); return; }
+  await askAI('/api/ai/notes-expand', { notes }, document.getElementById('notes-suggest'));
+}
+
+// ── SMART NOTES SAVE/LOAD ────────────────────────────────────────
+function getSavedNotes() { return JSON.parse(localStorage.getItem('malik-smart-notes') || '{}'); }
+function saveSmartNotes() {
+  const name = document.getElementById('notes-save-name').value.trim() || 'Untitled ' + new Date().toLocaleDateString('en-GB');
+  const el = document.getElementById('notes-area');
+  const html = el.innerHTML;
+  const text = el.innerText || '';
+  if(!text.trim()) { showNotif('Write some notes first'); return; }
+  const notes = getSavedNotes();
+  notes[name] = { html, text, date: new Date().toISOString() };
+  localStorage.setItem('malik-smart-notes', JSON.stringify(notes));
+  populateNotesSelect();
+  showNotif('Notes saved: ' + name);
+}
+function loadNoteSlot() {
+  const sel = document.getElementById('notes-slot-select');
+  if(!sel || !sel.value) return;
+  const notes = getSavedNotes();
+  if(notes[sel.value]) {
+    document.getElementById('notes-area').innerHTML = notes[sel.value].html;
+    document.getElementById('notes-save-name').value = sel.value;
+    showNotif('Loaded: ' + sel.value);
+  }
+}
+function deleteNoteSlot() {
+  const sel = document.getElementById('notes-slot-select');
+  if(!sel || !sel.value) { showNotif('Select a note to delete'); return; }
+  const notes = getSavedNotes();
+  delete notes[sel.value];
+  localStorage.setItem('malik-smart-notes', JSON.stringify(notes));
+  populateNotesSelect();
+  showNotif('Deleted: ' + sel.value);
+}
+function populateNotesSelect() {
+  const sel = document.getElementById('notes-slot-select');
+  if(!sel) return;
+  const notes = getSavedNotes();
+  sel.innerHTML = '<option value="">— Load saved note —</option>' +
+    Object.keys(notes).map(k => '<option value="'+k+'">'+k+'</option>').join('');
+}
+setTimeout(populateNotesSelect, 200);
+
+function newSmartNote() {
+  document.getElementById('notes-area').innerHTML = '';
+  document.getElementById('notes-save-name').value = '';
+  document.getElementById('notes-suggest').innerHTML = 'Start writing — AI autocomplete will activate...';
+  const sel = document.getElementById('notes-slot-select');
+  if(sel) sel.value = '';
+  window._lastSug = null;
+  showNotif('New note started');
+}
+
+// ── IDEAS ────────────────────────────────────────────────────────
+let ideas = [];
+
+async function loadIdeas() {
+  try {
+    ideas = await api('GET', '/api/ideas');
+    renderIdeas();
+    updateStats();
+  } catch(e) {
+    ideas = JSON.parse(localStorage.getItem('malik-ideas') || '[]');
+    renderIdeas();
+  }
+}
+
+async function saveIdea() {
+  const title = document.getElementById('idea-title').value.trim();
+  const desc  = document.getElementById('idea-desc').value.trim();
+  if(!title) { showNotif('Add a title first'); return; }
+  try {
+    const idea = await api('POST', '/api/ideas', {
+      title, description: desc,
+      category: document.getElementById('idea-cat').value,
+      priority: document.getElementById('idea-priority').value
+    });
+    ideas.unshift(idea);
+    document.getElementById('idea-title').value = '';
+    document.getElementById('idea-desc').value = '';
+    document.getElementById('idea-expand-result').style.display = 'none';
+    renderIdeas();
+    showNotif('Idea captured: ' + title);
+    updateStats();
+  } catch(e) { showNotif('Save failed: ' + e.message, 'error'); }
+}
+
+async function aiExpandIdea() {
+  const title = document.getElementById('idea-title').value.trim();
+  const desc  = document.getElementById('idea-desc').value.trim();
+  if(!title) { showNotif('Add a title first'); return; }
+  const el = document.getElementById('idea-expand-result');
+  el.style.display = 'block';
+  await askAI('/api/ai/expand-idea', { title, description: desc }, el);
+}
+
+function renderIdeas() {
+  const c = document.getElementById('ideas-container');
+  if(!ideas.length) {
+    c.innerHTML = '<div style="color:var(--muted2);font-size:12px;text-align:center;padding:20px">No ideas yet — use ADD IDEA</div>';
+    return;
+  }
+  c.innerHTML = ideas.map((idea, i) => {
+    const id = idea.id || i;
+    return '<div class="idea-item" id="idea-item-'+id+'">' +
+      '<div style="flex:1" id="idea-view-'+id+'">' +
+        '<strong>' + idea.title + '</strong>' +
+        (idea.description ? '<div style="margin-top:3px;color:var(--muted);font-size:11px">'+idea.description+'</div>' : '') +
+        '<div class="idea-meta">' + (idea.category||'') + ' · ' + (idea.priority||'') + ' · ' + new Date(idea.created_at||Date.now()).toLocaleDateString('en-GB') + '</div>' +
+      '</div>' +
+      '<div id="idea-edit-'+id+'" style="display:none;flex:1">' +
+        '<input type="text" class="os-input" id="ie-title-'+id+'" value="'+idea.title+'" style="margin-bottom:6px;font-size:11px">' +
+        '<input type="text" class="os-input" id="ie-desc-'+id+'" value="'+(idea.description||'')+'" placeholder="Description" style="font-size:11px">' +
+      '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:4px;margin-left:10px">' +
+        '<button class="icon-btn" onclick="toggleIdeaEdit('+id+')" id="ie-btn-'+id+'" title="Edit">✏</button>' +
+        '<button class="icon-btn" onclick="deleteIdea('+id+')" title="Delete">✕</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function toggleIdeaEdit(id) {
+  const viewEl = document.getElementById('idea-view-'+id);
+  const editEl = document.getElementById('idea-edit-'+id);
+  const btn = document.getElementById('ie-btn-'+id);
+  const isEditing = editEl.style.display !== 'none';
+  if(isEditing) {
+    // Save edit
+    const newTitle = document.getElementById('ie-title-'+id).value.trim();
+    const newDesc = document.getElementById('ie-desc-'+id).value.trim();
+    const idea = ideas.find(i => (i.id||ideas.indexOf(i)) == id);
+    if(idea && newTitle) {
+      idea.title = newTitle;
+      idea.description = newDesc;
+      localStorage.setItem('malik-ideas', JSON.stringify(ideas));
+      try { api('PUT', '/api/ideas/'+id, {title:newTitle, description:newDesc}); } catch(e){}
+    }
+    editEl.style.display = 'none';
+    viewEl.style.display = 'block';
+    btn.textContent = '✏';
+    renderIdeas();
+  } else {
+    viewEl.style.display = 'none';
+    editEl.style.display = 'block';
+    btn.textContent = '✓';
+  }
+}
+
+async function deleteIdea(id) {
+  try {
+    await api('DELETE', '/api/ideas/' + id);
+  } catch(e) {}
+  ideas = ideas.filter(i => (i.id !== id) && (ideas.indexOf(i) !== id));
+  localStorage.setItem('malik-ideas', JSON.stringify(ideas));
+  renderIdeas();
+  updateStats();
+}
+
+loadIdeas();
+// Populate mindmap dropdown on load
+setTimeout(populateMindmapSelect, 100);
+
+// ── ML PATHWAY ───────────────────────────────────────────────────
+const mlPath = [
+  {n:'1',t:'Linear Algebra',            d:'3B1B Essence series → MIT 18.06 (Gilbert Strang). Foundation for everything.',dur:'Weeks 1–6'},
+  {n:'2',t:'Calculus & Probability',    d:'MIT 18.02 + MIT 6.041. The language of ML.',                                  dur:'Weeks 7–10'},
+  {n:'3',t:'Andrew Ng ML Specialisation',d:'Coursera audit free. All 3 courses, every assignment. No skipping.',        dur:'Weeks 11–18'},
+  {n:'4',t:'MIT 6.034 AI (OCW)',        d:'Classical AI + neural nets from scratch. Complements Ng perfectly.',          dur:'Weeks 19–26'},
+  {n:'5',t:'Build an ML Project',       d:'Train a model on signal processing data. EEE crossover. Ship to GitHub.',     dur:'Ongoing'},
+];
+const mlEl = document.getElementById('ml-pathway');
+if(mlEl) mlEl.innerHTML = mlPath.map(s => `
+  <div style="display:grid;grid-template-columns:28px 1fr auto;gap:12px;padding:12px 14px;background:var(--s2);border:1px solid var(--border);border-left:2px solid var(--lime)">
+    <div style="font-family:var(--display);font-size:22px;color:var(--lime)">${s.n}</div>
+    <div><div style="font-size:13px;font-weight:700;margin-bottom:2px">${s.t}</div><div style="font-size:11px;color:var(--muted)">${s.d}</div></div>
+    <div style="font-size:10px;color:var(--gold);white-space:nowrap;padding-top:2px">${s.dur}</div>
+  </div>`).join('');
+
+// ── STUDY EXPLAIN ────────────────────────────────────────────────
+async function studyExplain() {
+  const concept = document.getElementById('study-q').value.trim();
+  const level = document.getElementById('study-level').value;
+  if(!concept) { showNotif('Enter a concept first'); return; }
+  await askAI('/api/ai/explain', { concept, level }, document.getElementById('study-answer'));
+}
+document.addEventListener('keydown', e => {
+  if(e.key === 'Enter' && document.activeElement?.id === 'study-q') studyExplain();
+});
+
+// ── QURAN ────────────────────────────────────────────────────────
+let qState = { sabaq:0, sabqi:0, manzil:0, tilawah:0 };
+
+async function loadQuran() {
+  try {
+    qState = await api('GET', '/api/quran/today');
+  } catch(e) {
+    qState = JSON.parse(localStorage.getItem('malik-quran') || '{"sabaq":0,"sabqi":0,"manzil":0,"tilawah":0}');
+  }
+  ['sabaq','sabqi','manzil','tilawah'].forEach(k => {
+    const el = document.getElementById(k + '-count');
+    if(el) el.textContent = qState[k] || 0;
+  });
+}
+
+async function changeCount(key, delta) {
+  qState[key] = Math.max(0, (qState[key] || 0) + delta);
+  const el = document.getElementById(key + '-count');
+  if(el) el.textContent = qState[key];
+  try {
+    await api('POST', '/api/quran/today', qState);
+  } catch(e) {
+    localStorage.setItem('malik-quran', JSON.stringify(qState));
+  }
+}
+loadQuran();
+
+// ── QURAN HIFZ PROGRESS TRACKER ──────────────────────────────────
+const SURAHS = [
+  'Al-Fatiha','Al-Baqarah','Aal-Imran','An-Nisa','Al-Ma\'idah','Al-An\'am','Al-A\'raf','Al-Anfal','At-Tawbah','Yunus',
+  'Hud','Yusuf','Ar-Ra\'d','Ibrahim','Al-Hijr','An-Nahl','Al-Isra\'','Al-Kahf','Maryam','Taha',
+  'Al-Anbiya','Al-Hajj','Al-Mu\'minun','An-Nur','Al-Furqan','Ash-Shu\'ara','An-Naml','Al-Qasas','Al-Ankabut','Ar-Rum',
+  'Luqman','As-Sajdah','Al-Ahzab','Saba\'','Fatir','Ya-Sin','As-Saffat','Sad','Az-Zumar','Ghafir',
+  'Fussilat','Ash-Shura','Az-Zukhruf','Ad-Dukhan','Al-Jathiyah','Al-Ahqaf','Muhammad','Al-Fath','Al-Hujurat','Qaf',
+  'Adh-Dhariyat','At-Tur','An-Najm','Al-Qamar','Ar-Rahman','Al-Waqi\'ah','Al-Hadid','Al-Mujadila','Al-Hashr','Al-Mumtahanah',
+  'As-Saff','Al-Jumu\'ah','Al-Munafiqun','At-Taghabun','At-Talaq','At-Tahrim','Al-Mulk','Al-Qalam','Al-Haqqah','Al-Ma\'arij',
+  'Nuh','Al-Jinn','Al-Muzzammil','Al-Muddaththir','Al-Qiyamah','Al-Insan','Al-Mursalat','An-Naba\'','An-Nazi\'at','Abasa',
+  'At-Takwir','Al-Infitar','Al-Mutaffifin','Al-Inshiqaq','Al-Buruj','At-Tariq','Al-A\'la','Al-Ghashiyah','Al-Fajr','Al-Balad',
+  'Ash-Shams','Al-Layl','Ad-Duhaa','Ash-Sharh','At-Tin','Al-\'Alaq','Al-Qadr','Al-Bayyinah','Az-Zalzalah','Al-\'Adiyat',
+  'Al-Qari\'ah','At-Takathur','Al-\'Asr','Al-Humazah','Al-Fil','Quraysh','Al-Ma\'un','Al-Kawthar','Al-Kafirun','An-Nasr',
+  'Al-Masad','Al-Ikhlas','Al-Falaq','An-Nas'
+];
+
+function getHifzState() { return JSON.parse(localStorage.getItem('malik-hifz-surahs') || '[]'); }
+function saveHifzState(arr) { localStorage.setItem('malik-hifz-surahs', JSON.stringify(arr)); }
+
+function renderHifzGrid() {
+  const grid = document.getElementById('hifz-surah-grid');
+  if(!grid) return;
+  const memorised = getHifzState();
+  grid.innerHTML = SURAHS.map((s, i) => {
+    const num = i + 1;
+    const checked = memorised.includes(num);
+    const col = checked ? 'var(--lime)' : 'var(--muted2)';
+    const bg = checked ? 'rgba(200,255,0,0.08)' : 'transparent';
+    return '<label style="display:flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid ' +
+      (checked ? 'var(--lime)' : 'var(--border)') + ';border-radius:4px;cursor:pointer;font-size:10px;color:'+col+';background:'+bg+';transition:all 0.15s" ' +
+      'onmouseenter="this.style.borderColor=\'var(--lime)\'" onmouseleave="this.style.borderColor=\''+(checked?'var(--lime)':'var(--border)')+'\'">'+
+      '<input type="checkbox" '+(checked?'checked':'')+' onchange="toggleSurah('+num+')" style="accent-color:var(--lime);width:14px;height:14px">' +
+      '<span style="font-family:var(--mono);color:var(--muted);min-width:22px">'+num+'.</span> '+s+'</label>';
+  }).join('');
+  updateHifzProgress();
+}
+
+function toggleSurah(num) {
+  let memorised = getHifzState();
+  if(memorised.includes(num)) memorised = memorised.filter(n => n !== num);
+  else memorised.push(num);
+  saveHifzState(memorised);
+  renderHifzGrid();
+}
+
+function selectAllSurahs() {
+  saveHifzState(Array.from({length:114}, (_,i) => i+1));
+  renderHifzGrid();
+  showNotif('All 114 surahs marked as memorised');
+}
+function clearAllSurahs() {
+  if(!confirm('Clear all memorised surahs?')) return;
+  saveHifzState([]);
+  renderHifzGrid();
+  showNotif('Hifz progress cleared');
+}
+
+function updateHifzProgress() {
+  const memorised = getHifzState();
+  const count = memorised.length;
+  const pct = Math.round((count / 114) * 100);
+  const pctEl = document.getElementById('hifz-pct');
+  const countEl = document.getElementById('hifz-count');
+  const barEl = document.getElementById('hifz-bar');
+  if(pctEl) pctEl.textContent = pct + '%';
+  if(countEl) countEl.textContent = count + '/114 Surahs';
+  if(barEl) barEl.style.width = pct + '%';
+}
+
+setTimeout(renderHifzGrid, 300);
+
+// ── GYM ──────────────────────────────────────────────────────────
+const gymDays = {
+  1:{title:'DAY 1 — CHEST / BACK / BICEPS', ex:[
+    ['Bench Press','4','8','30kg'],['Pendlay Row','4','12','Bar'],
+    ['Incline DB Press','4','12','7.5kg'],['Lat Pulldown','3','12','25kg'],
+    ['Seated Cable Row','3','12','—'],['DB Curls','4','8','10kg']
+  ]},
+  2:{title:'DAY 2 — SHOULDERS / LEGS / TRICEPS', ex:[
+    ['Barbell Squat','4','8','—'],['Seated DB Press','4','12','—'],
+    ['Romanian Deadlift','4','12','—'],['Lateral Raise','4','12','—'],
+    ['DB Split Squat','3','20','—'],['DB Skullcrusher','4','10','—']
+  ]},
+  3:{title:'DAY 3 — CHEST / BACK / BICEPS', ex:[
+    ['Pull Ups','4','8','BW'],['Incline Bench Press','4','12','—'],
+    ['Chest Supported Row','4','12','—'],['Weighted Dip','4','12','BW'],
+    ['Machine Press/Fly','3','12','—'],['Incline DB Curl','4','12','—']
+  ]},
+  4:{title:'DAY 4 — SHOULDERS / LEGS / TRICEPS', ex:[
+    ['Standing OHP','4','8','—'],['Trap Bar Deadlift','4','12','—'],
+    ['Lateral Raise Var.','4','10','—'],['Leg Press','4','12','—'],
+    ['Lying Ham Curl','3','12','—'],['Tricep Pushdown','4','12','—']
+  ]}
+};
+let curGymDay = 1;
+let gymWeights = {};
+
+async function loadGymData() {
+  try {
+    gymWeights = await api('GET', '/api/gym/weights');
+  } catch(e) {
+    gymWeights = JSON.parse(localStorage.getItem('malik-gym-weights') || '{}');
+  }
+  showGymDay(1);
+  await loadGymLog();
+  populateChartExerciseSelect();
+}
+
+// ── GYM — Target editing mode ────────────────────────────────────
+let gymEditMode = false;
+function getGymCustomData() { return JSON.parse(localStorage.getItem('malik-gym-custom') || '{}'); }
+function saveGymCustomData(data) { localStorage.setItem('malik-gym-custom', JSON.stringify(data)); }
+
+function toggleEditGymTargets() {
+  gymEditMode = !gymEditMode;
+  const btn = document.getElementById('gym-edit-targets-btn');
+  if(btn) {
+    btn.textContent = gymEditMode ? '✓ DONE EDITING' : '✏ EDIT TARGETS';
+    btn.className = gymEditMode ? 'btn btn-lime btn-sm' : 'btn btn-violet btn-sm';
+  }
+  showGymDay(curGymDay);
+}
+
+function saveGymTarget(d, i, field, value) {
+  const custom = getGymCustomData();
+  const key = 'd'+d+'-'+i;
+  if(!custom[key]) custom[key] = {};
+  custom[key][field] = value;
+  saveGymCustomData(custom);
+  // Also update in-memory gymDays
+  const fieldIdx = {sets:1, reps:2, target:3}[field];
+  if(fieldIdx !== undefined) gymDays[d].ex[i][fieldIdx] = value;
+}
+
+function showGymDay(d) {
+  curGymDay = d;
+  const custom = getGymCustomData();
+  const day = gymDays[d];
+  // Apply saved customisations
+  day.ex.forEach((ex, i) => {
+    const c = custom['d'+d+'-'+i];
+    if(c) {
+      if(c.sets) ex[1] = c.sets;
+      if(c.reps) ex[2] = c.reps;
+      if(c.target) ex[3] = c.target;
+    }
+  });
+  document.getElementById('gym-day-title').textContent = day.title;
+  const adv = document.getElementById('gym-advice');
+  adv.style.display = 'none';
+  adv.className = 'ai-box';
+  if(gymEditMode) {
+    // Editable mode — all cells are inputs
+    document.getElementById('gym-table').innerHTML =
+      '<tr><th>Exercise</th><th>Sets</th><th>Reps</th><th>Target</th><th>Actual</th></tr>' +
+      day.ex.map((ex, i) =>
+        '<tr><td>' + ex[0] + '</td>' +
+        '<td><input type="text" class="weight-input" value="' + ex[1] + '" style="width:50px" onchange="saveGymTarget(' + d + ',' + i + ',\'sets\',this.value)"></td>' +
+        '<td><input type="text" class="weight-input" value="' + ex[2] + '" style="width:50px" onchange="saveGymTarget(' + d + ',' + i + ',\'reps\',this.value)"></td>' +
+        '<td><input type="text" class="weight-input" value="' + ex[3] + '" style="width:70px;color:var(--lime)" onchange="saveGymTarget(' + d + ',' + i + ',\'target\',this.value)"></td>' +
+        '<td><input type="text" class="weight-input" placeholder="' + ex[3] + '" ' +
+        'value="' + (gymWeights['d'+d+'-'+i] || '') + '" ' +
+        'onchange="saveWeight(' + d + ',' + i + ',this.value)"></td></tr>'
+      ).join('');
+  } else {
+    // Normal mode
+    document.getElementById('gym-table').innerHTML =
+      '<tr><th>Exercise</th><th>Sets</th><th>Reps</th><th>Target</th><th>Actual</th></tr>' +
+      day.ex.map((ex, i) =>
+        '<tr><td>' + ex[0] + '</td><td>' + ex[1] + '</td><td>' + ex[2] + '</td>' +
+        '<td style="color:var(--lime);font-family:var(--mono)">' + ex[3] + '</td>' +
+        '<td><input type="text" class="weight-input" placeholder="' + ex[3] + '" ' +
+        'value="' + (gymWeights['d'+d+'-'+i] || '') + '" ' +
+        'onchange="saveWeight(' + d + ',' + i + ',this.value)"></td></tr>'
+      ).join('');
+  }
+}
+
+async function saveWeight(d, i, weight) {
+  gymWeights['d'+d+'-'+i] = weight;
+  try {
+    await api('POST', '/api/gym/weights', { dayNum: d, exerciseIdx: i, weight });
+  } catch(e) {
+    localStorage.setItem('malik-gym-weights', JSON.stringify(gymWeights));
+  }
+}
+
+async function logGymSession() {
+  try {
+    await api('POST', '/api/gym/sessions', {
+      dayNum: curGymDay,
+      dayTitle: gymDays[curGymDay].title,
+      weights: gymWeights
+    });
+    showNotif('Session logged: ' + gymDays[curGymDay].title);
+    await loadGymLog();
+  } catch(e) { showNotif('Log failed: ' + e.message, 'error'); }
+}
+
+async function aiGymAdvice() {
+  const el = document.getElementById('gym-advice');
+  el.style.display = 'block';
+  await askAI('/api/ai/gym-advice', {
+    dayNum: curGymDay,
+    dayTitle: gymDays[curGymDay].title,
+    exercises: gymDays[curGymDay].ex.map(e => e[0])
+  }, el);
+}
+
+async function loadGymLog() {
+  try {
+    const sessions = await api('GET', '/api/gym/sessions');
+    const c = document.getElementById('gym-log');
+    if(!sessions.length) {
+      c.innerHTML = '<div style="color:var(--muted2);font-size:12px">No sessions logged yet.</div>';
+      return;
+    }
+    c.innerHTML = sessions.map(s =>
+      '<div style="padding:9px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">' +
+      '<div style="font-size:12px;font-weight:700">' + s.day_title + '</div>' +
+      '<div style="display:flex;gap:8px;align-items:center">' +
+        '<span style="font-size:10px;color:var(--muted)">' + new Date(s.logged_at).toLocaleString('en-GB') + '</span>' +
+        '<button class="icon-btn" onclick="editGymSession(' + s.id + ')" title="Edit">✏</button>' +
+        '<button class="icon-btn" onclick="deleteGymSession(' + s.id + ')" title="Delete">✕</button>' +
+      '</div></div>'
+    ).join('');
+  } catch(e) {
+    document.getElementById('gym-log').innerHTML = '<div style="color:var(--muted2);font-size:12px">Could not load sessions.</div>';
+  }
+}
+
+async function deleteGymSession(id) {
+  if(!confirm('Delete this gym session?')) return;
+  try {
+    await api('DELETE', '/api/gym/sessions/' + id);
+    showNotif('Session deleted');
+    await loadGymLog();
+  } catch(e) {
+    // Also remove from local sessions
+    const local = JSON.parse(localStorage.getItem('malik-gym-sessions-local') || '[]');
+    const filtered = local.filter(s => s.id !== id);
+    localStorage.setItem('malik-gym-sessions-local', JSON.stringify(filtered));
+    showNotif('Session deleted locally');
+    await loadGymLog();
+  }
+}
+
+function editGymSession(id) {
+  // Load the session's day and navigate to it
+  showNotif('Session loaded — update weights and log again to overwrite');
+}
+
+// ── GYM PROGRESS CHART ───────────────────────────────────────────
+function populateChartExerciseSelect() {
+  const sel = document.getElementById('chart-exercise');
+  if(!sel) return;
+  const opts = [];
+  Object.entries(gymDays).forEach(([d, day]) => {
+    day.ex.forEach((ex, i) => {
+      opts.push('<option value="' + d + '-' + i + '">' + 'D' + d + ': ' + ex[0] + '</option>');
+    });
+  });
+  sel.innerHTML = opts.join('');
+}
+
+async function renderProgressChart() {
+  const sel = document.getElementById('chart-exercise');
+  if(!sel) return;
+  const [d, i] = sel.value.split('-');
+  const canvas = document.getElementById('progress-chart');
+  const emptyEl = document.getElementById('chart-empty');
+  try {
+    const data = await api('GET', '/api/gym/progress/' + d + '/' + i);
+    if(!data.length) {
+      emptyEl.style.display = 'block';
+      return;
+    }
+    emptyEl.style.display = 'none';
+    const ctx = canvas.getContext('2d');
+    const W = canvas.offsetWidth;
+    const H = 200;
+    canvas.width = W;
+    canvas.height = H;
+    ctx.fillStyle = '#0e0e12';
+    ctx.fillRect(0, 0, W, H);
+
+    const weights = data.map(r => parseFloat(r.weight) || 0);
+    const labels  = data.map(r => new Date(r.logged_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'}));
+    const maxW = Math.max(...weights) * 1.1 || 1;
+    const minW = Math.min(...weights) * 0.9;
+    const pad = { t:20, r:20, b:40, l:40 };
+    const chartW = W - pad.l - pad.r;
+    const chartH = H - pad.t - pad.b;
+
+    // Grid lines
+    ctx.strokeStyle = '#1e1e26';
+    ctx.lineWidth = 1;
+    for(let g=0;g<=4;g++) {
+      const y = pad.t + chartH * (g/4);
+      ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(W-pad.r,y); ctx.stroke();
+      ctx.fillStyle = '#5a5a72';
+      ctx.font = '9px Space Mono, monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText((maxW - (maxW-minW)*(g/4)).toFixed(1)+'kg', pad.l-4, y+3);
+    }
+
+    // Plot line
+    ctx.strokeStyle = '#c8ff00';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = '#c8ff00';
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    weights.forEach((w, idx) => {
+      const x = pad.l + (idx / Math.max(weights.length-1,1)) * chartW;
+      const y = pad.t + (1 - (w-minW)/(maxW-minW||1)) * chartH;
+      idx === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+
+    // Dots + labels
+    ctx.shadowBlur = 0;
+    weights.forEach((w, idx) => {
+      const x = pad.l + (idx / Math.max(weights.length-1,1)) * chartW;
+      const y = pad.t + (1 - (w-minW)/(maxW-minW||1)) * chartH;
+      ctx.fillStyle = '#c8ff00';
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = '#5a5a72';
+      ctx.font = '8px Space Mono, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(labels[idx], x, H-pad.b+14);
+      ctx.fillStyle = '#c8ff00';
+      ctx.fillText(w+'kg', x, y-8);
+    });
+  } catch(e) {
+    emptyEl.style.display = 'block';
+    emptyEl.textContent = 'Error loading chart: ' + e.message;
+  }
+}
+
+loadGymData();
+
+// ── UNIVERSITY / GRADE CALCULATOR ───────────────────────────────
+let modules = [];
+
+// Seed data — Semester 1 modules pre-loaded
+const SEED_MODULES = [
+  { id:1, name:'EG-133 Engineering for People Hackathon', credits:10, year:1, assessments:[
+    { id:101, module_id:1, name:'Coursework 1', weight:20, score:0,   max_score:100 },
+    { id:102, module_id:1, name:'Coursework 2', weight:25, score:75,  max_score:100 },
+    { id:103, module_id:1, name:'Coursework 3', weight:25, score:75,  max_score:100 },
+    { id:104, module_id:1, name:'Coursework 4', weight:30, score:80,  max_score:100 },
+  ]},
+  { id:2, name:'EG-151 Microcontrollers', credits:10, year:1, assessments:[
+    { id:201, module_id:2, name:'Portfolio Paperwork', weight:10, score:0,  max_score:100 },
+    { id:202, module_id:2, name:'Practical',           weight:20, score:73, max_score:100 },
+    { id:203, module_id:2, name:'Laboratory Work',     weight:20, score:80, max_score:100 },
+    { id:204, module_id:2, name:'Project',             weight:25, score:80, max_score:100 },
+    { id:205, module_id:2, name:'Online Exam',         weight:25, score:81, max_score:100 },
+  ]},
+  { id:3, name:'EG-158 Software Engineering', credits:10, year:1, assessments:[
+    { id:301, module_id:3, name:'Coursework 1',       weight:15, score:100, max_score:100 },
+    { id:302, module_id:3, name:'Coursework 2',       weight:15, score:100, max_score:100 },
+    { id:303, module_id:3, name:'Coursework 3',       weight:20, score:80,  max_score:100 },
+    { id:304, module_id:3, name:'Coursework 4',       weight:20, score:90,  max_score:100 },
+    { id:305, module_id:3, name:'Exam (January)',     weight:30, score:78,  max_score:100 },
+  ]},
+  { id:4, name:'EG-155 Circuit Analysis', credits:10, year:1, assessments:[
+    { id:401, module_id:4, name:'Coursework 1', weight:25, score:100, max_score:100 },
+    { id:402, module_id:4, name:'Coursework 2', weight:35, score:80,  max_score:100 },
+    { id:403, module_id:4, name:'Class Test',   weight:40, score:66,  max_score:100 },
+  ]},
+  { id:5, name:'EG-143 Digital Design', credits:10, year:1, assessments:[
+    { id:501, module_id:5, name:'Coursework 1', weight:33, score:80, max_score:100 },
+    { id:502, module_id:5, name:'Coursework 2', weight:33, score:63, max_score:100 },
+    { id:503, module_id:5, name:'Coursework 3', weight:34, score:53, max_score:100 },
+  ]},
+  { id:6, name:'EGA-127 Engineering Mathematics', credits:10, year:1, assessments:[] },
+];
+
+async function loadModules() {
+  // Try backend first
+  try {
+    const data = await api('GET', '/api/modules');
+    if(data && data.length > 0) {
+      modules = data;
+      renderModules();
+      calcOverallGrade();
+      return;
+    }
+  } catch(e) { /* backend not ready yet */ }
+
+  // Fall back to localStorage
+  const stored = localStorage.getItem('malik-modules-v2');
+  if(stored) {
+    try {
+      modules = JSON.parse(stored);
+      renderModules();
+      calcOverallGrade();
+      return;
+    } catch(e) {}
+  }
+
+  // First time — use seed data
+  modules = JSON.parse(JSON.stringify(SEED_MODULES)); // deep clone
+  saveModulesLocal();
+  renderModules();
+  calcOverallGrade();
+}
+
+function saveModulesLocal() {
+  localStorage.setItem('malik-modules-v2', JSON.stringify(modules));
+}
+
+function showAddModule() {
+  const f = document.getElementById('add-module-form');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+async function addModule() {
+  const name = document.getElementById('mod-name').value.trim();
+  const credits = parseInt(document.getElementById('mod-credits').value) || 10;
+  if(!name) { showNotif('Enter module name'); return; }
+  // Always add locally first for instant feedback
+  const newMod = { id: Date.now(), name, credits, year: 1, assessments: [] };
+  modules.push(newMod);
+  saveModulesLocal();
+  document.getElementById('mod-name').value = '';
+  document.getElementById('mod-credits').value = '';
+  renderModules();
+  showNotif('Module added: ' + name);
+  // Also try to sync to backend
+  try { await api('POST', '/api/modules', { name, credits, year: 1 }); } catch(e) {}
+}
+
+async function deleteModule(id) {
+  modules = modules.filter(m => m.id !== id);
+  saveModulesLocal();
+  renderModules();
+  calcOverallGrade();
+  try { await api('DELETE', '/api/modules/' + id); } catch(e) {}
+}
+
+async function addAssessment(moduleId) {
+  const name   = document.getElementById('aname-' + moduleId).value.trim();
+  const weight = parseFloat(document.getElementById('awt-'   + moduleId).value) || 0;
+  const score  = parseFloat(document.getElementById('asc-'   + moduleId).value);
+  if(!name || !weight) { showNotif('Enter assessment name and weight'); return; }
+  const mod = modules.find(m => m.id === moduleId);
+  if(!mod) return;
+  const newA = { id: Date.now(), module_id: moduleId, name, weight, score: isNaN(score)?null:score, max_score: 100 };
+  mod.assessments.push(newA);
+  saveModulesLocal();
+  renderModules();
+  calcOverallGrade();
+  try { await api('POST', '/api/modules/' + moduleId + '/assessments', { name, weight, score: isNaN(score)?null:score }); } catch(e) {}
+}
+
+async function updateScore(assessmentId, moduleId, score) {
+  const mod = modules.find(m => m.id === moduleId);
+  if(mod) {
+    const a = mod.assessments.find(x => x.id === assessmentId);
+    if(a) a.score = parseFloat(score);
+  }
+  saveModulesLocal();
+  calcOverallGrade();
+  try { await api('PUT', '/api/assessments/' + assessmentId, { score: parseFloat(score) }); } catch(e) {}
+}
+
+async function deleteAssessment(id, moduleId) {
+  const mod = modules.find(m => m.id === moduleId);
+  if(mod) mod.assessments = mod.assessments.filter(a => a.id !== id);
+  saveModulesLocal();
+  renderModules();
+  calcOverallGrade();
+  try { await api('DELETE', '/api/assessments/' + id); } catch(e) {}
+}
+
+function calcModuleGrade(mod) {
+  const scored = mod.assessments.filter(a => a.score !== null && a.score !== undefined && a.weight);
+  if(!scored.length) return null;
+  const totalWeight = scored.reduce((s,a) => s + parseFloat(a.weight), 0);
+  const weighted = scored.reduce((s,a) => s + (parseFloat(a.score)/parseFloat(a.max_score||100))*100*parseFloat(a.weight), 0);
+  return weighted / totalWeight;
+}
+
+function gradeClass(pct) {
+  if(pct >= 70) return { cls:'First (1st)', color:'var(--lime)' };
+  if(pct >= 60) return { cls:'2:1', color:'var(--teal)' };
+  if(pct >= 50) return { cls:'2:2', color:'var(--gold)' };
+  if(pct >= 40) return { cls:'Third', color:'var(--orange)' };
+  return { cls:'Fail', color:'var(--red)' };
+}
+
+function calcOverallGrade() {
+  const graded = modules.map(m => ({ grade: calcModuleGrade(m), credits: parseInt(m.credits)||10 })).filter(m => m.grade !== null);
+  if(!graded.length) { document.getElementById('overall-grade').textContent = '—'; document.getElementById('overall-class').textContent = '—'; return; }
+  const totalCredits = graded.reduce((s,m) => s+m.credits, 0);
+  const weighted = graded.reduce((s,m) => s + m.grade*m.credits, 0);
+  const avg = weighted / totalCredits;
+  const gc = gradeClass(avg);
+  document.getElementById('overall-grade').textContent = avg.toFixed(1) + '%';
+  document.getElementById('overall-grade').style.color = gc.color;
+  document.getElementById('overall-class').textContent = gc.cls;
+  document.getElementById('overall-class').style.color = gc.color;
+}
+
+function renderModules() {
+  const c = document.getElementById('modules-container');
+  if(!c) return;
+  if(!modules.length) {
+    c.innerHTML = '<div style="color:var(--muted2);font-size:12px;text-align:center;padding:30px">No modules yet — add your first module above</div>';
+    return;
+  }
+  c.innerHTML = modules.map(mod => {
+    const grade = calcModuleGrade(mod);
+    const gc = grade !== null ? gradeClass(grade) : null;
+    const totalWt = mod.assessments.reduce((s,a) => s+parseFloat(a.weight||0),0);
+    return `
+    <div class="panel" style="margin-bottom:12px">
+      <div class="panel-header">
+        <div>
+          <span class="panel-title">${mod.name}</span>
+          <span style="font-size:9px;color:var(--muted);margin-left:10px">${mod.credits} credits</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          ${gc ? '<span style="font-family:var(--display);font-size:20px;color:' + gc.color + '">' + grade.toFixed(1) + '% — ' + gc.cls + '</span>' : '<span style="color:var(--muted2);font-size:11px">No scores yet</span>'}
+          <button class="icon-btn" onclick="deleteModule(${mod.id})">✕</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <table style="width:100%;border-collapse:collapse;margin-bottom:14px">
+          <tr>
+            <th style="font-size:9px;letter-spacing:0.15em;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">Assessment</th>
+            <th style="font-size:9px;letter-spacing:0.15em;color:var(--muted);text-align:center;padding:6px 8px;border-bottom:1px solid var(--border)">Weight %</th>
+            <th style="font-size:9px;letter-spacing:0.15em;color:var(--muted);text-align:center;padding:6px 8px;border-bottom:1px solid var(--border)">Score %</th>
+            <th style="font-size:9px;letter-spacing:0.15em;color:var(--muted);text-align:center;padding:6px 8px;border-bottom:1px solid var(--border)">Contribution</th>
+            <th></th>
+          </tr>
+          ${mod.assessments.map(a => {
+            const contribution = a.score !== null && a.score !== undefined ? ((parseFloat(a.score)/parseFloat(a.max_score||100))*100*parseFloat(a.weight)/100).toFixed(1) : '—';
+            const scoreColor = a.score !== null && a.score !== undefined ? gradeClass(parseFloat(a.score)).color : 'var(--muted2)';
+            return `<tr>
+              <td style="padding:8px;font-size:12px;border-bottom:1px solid var(--border)">${a.name}</td>
+              <td style="padding:8px;text-align:center;font-size:12px;border-bottom:1px solid var(--border);color:var(--muted)">${a.weight}%</td>
+              <td style="padding:8px;text-align:center;border-bottom:1px solid var(--border)">
+                <input type="number" min="0" max="100" step="0.1"
+                  value="${a.score !== null && a.score !== undefined ? a.score : ''}"
+                  placeholder="—"
+                  style="width:60px;background:transparent;border:none;border-bottom:1px solid var(--border2);color:${scoreColor};font-family:var(--mono);font-size:12px;text-align:center;outline:none"
+                  onchange="updateScore(${a.id},${mod.id},this.value)">
+              </td>
+              <td style="padding:8px;text-align:center;font-size:12px;border-bottom:1px solid var(--border);color:${scoreColor}">${contribution}%</td>
+              <td style="padding:8px;border-bottom:1px solid var(--border)"><button class="icon-btn" onclick="deleteAssessment(${a.id},${mod.id})">✕</button></td>
+            </tr>`;
+          }).join('')}
+        </table>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:10px">Total weight allocated: <span style="color:${totalWt===100?'var(--lime)':totalWt>100?'var(--red)':'var(--gold)'}">${totalWt}%</span> ${totalWt===100?'✓':totalWt>100?'(over 100%)':'(remaining: '+(100-totalWt)+'%)'}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <input type="text" class="os-input" id="aname-${mod.id}" placeholder="Assessment name" style="flex:2;min-width:140px;font-size:11px">
+          <input type="number" class="os-input" id="awt-${mod.id}" placeholder="Weight %" style="width:80px;font-size:11px">
+          <input type="number" class="os-input" id="asc-${mod.id}" placeholder="Score %" style="width:80px;font-size:11px">
+          <button class="btn btn-teal btn-sm" onclick="addAssessment(${mod.id})">+ ADD</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+loadModules();
+
+// ── CAREERS ──────────────────────────────────────────────────────
+const careerData = {
+  embedded:  { title:'Embedded Systems',      icon:'🔧', color:'var(--teal)',   salary:'£35k–£85k',  skills:['C/C++','RTOS','ARM Cortex-M','SPI/I2C','JTAG','KiCad','Git'], overview:'Firmware, microcontrollers, IoT, automotive — one of the most in-demand EEE paths.', roadmap:[{t:'Master C Programming',d:'Pointers, memory, bit manipulation. Foundation of everything embedded.'},{t:'Get an STM32 Board',d:'£10 STM32F4. Write bare-metal code without Arduino libraries.'},{t:'Learn FreeRTOS',d:'Task scheduling, semaphores, queues. Every real product uses an RTOS.'},{t:'Build 3 Portfolio Projects',d:'Driver library, IoT sensor node, motor controller. Ship all to GitHub.'},{t:'Contribute to Open Source',d:'Zephyr or FreeRTOS on GitHub. Massive CV differentiator.'}], resources:[{type:'Book',name:'Programming Embedded Systems',desc:'Barr & Massa — the bible'},{type:'Course',name:'FastBit Embedded C (Udemy)',desc:'Most practical embedded C course'},{type:'YouTube',name:'Low Level Learning',desc:'Best embedded YouTube channel'},{type:'Tool',name:'STM32CubeIDE',desc:'Free official IDE for STM32'}], companies:['ARM','STMicroelectronics','NXP','Qualcomm','BAE Systems','Dyson']},
+  'ai-ml':   { title:'AI/ML Engineer',        icon:'🤖', color:'var(--violet)', salary:'£50k–£150k+', skills:['Python','PyTorch','Linear Algebra','Signal Processing','Edge ML','Statistics','Git'], overview:'EEE + ML — signal processing AI, edge ML on embedded, neural networks for hardware.', roadmap:[{t:'Linear Algebra First',d:'3B1B then MIT 18.06. Without this ML is a black box forever.'},{t:'Python + NumPy/Pandas',d:'Scientific stack. Learn vectorisation, not for loops.'},{t:'Andrew Ng ML Course',d:'Coursera, audit free. Complete every assignment.'},{t:'PyTorch from Scratch',d:'Build a neural net without ML libraries first, then use PyTorch.'},{t:'EEE + ML Crossover Project',d:'Train on a signal dataset (ECG, audio, vibration).'}], resources:[{type:'Course',name:'Andrew Ng ML Specialisation',desc:'Coursera — the definitive starting point'},{type:'Book',name:'Deep Learning (Goodfellow)',desc:'Free at deeplearningbook.org'},{type:'YouTube',name:'3Blue1Brown',desc:'Neural Networks series — unmatched intuition'},{type:'YouTube',name:'Andrej Karpathy',desc:'Building GPT from scratch'}], companies:['DeepMind','Waymo','Tesla','ARM','Graphcore','Amazon']},
+  power:     { title:'Power & Energy',         icon:'⚡', color:'var(--gold)',   salary:'£32k–£75k',  skills:['Power electronics','MATLAB/Simulink','Grid systems','SCADA','Renewables','Power factor'], overview:'Grid infrastructure, renewables, power electronics. Huge demand with the energy transition.', roadmap:[{t:'Master Circuit Theory',d:'Thevenin/Norton, AC analysis, power factor. Hayt textbook.'},{t:'Learn MATLAB/Simulink',d:'Industry standard. Free with your Swansea uni license.'},{t:'Power Electronics Project',d:'Build a buck/boost converter. Understand switching regulators.'},{t:'Get IEEE Membership',d:'Free student membership. Papers, events, networking.'},{t:'Target Summer Internship',d:'National Grid, SSE, Siemens Energy all have grad schemes.'}], resources:[{type:'Book',name:'Power Electronics (Mohan)',desc:'Ned Mohan — the standard textbook'},{type:'YouTube',name:'The Engineering Mindset',desc:'Excellent power explanations'},{type:'Tool',name:'MATLAB/Simulink',desc:'Free with Swansea license'}], companies:['National Grid','Siemens Energy','SSE','Orsted','Rolls-Royce','ABB']},
+  rf:        { title:'RF & Telecoms',          icon:'📡', color:'var(--green)',  salary:'£38k–£90k',  skills:['RF circuit design','Antenna theory','ADS/CST','Signal processing','MATLAB','VNA'], overview:'Wireless comms, antennas, 5G/6G, satellite, radar. Highly specialised and well paid.', roadmap:[{t:'Strong EM Theory',d:"Maxwell equations, transmission lines, Smith chart. Your uni EM module."},{t:'Learn RF Simulation',d:'CST Studio (free student) or ADS. Simulate a patch antenna.'},{t:'Build an SDR Project',d:'RTL-SDR dongle £20. Receive aircraft signals, decode FM.'},{t:'Study 5G NR Standard',d:'3GPP free specs + Sharetechnote.com.'}], resources:[{type:'Book',name:'Pozar Microwave Engineering',desc:'The RF bible'},{type:'Tool',name:'RTL-SDR',desc:'£20 software defined radio'},{type:'YouTube',name:'W2AEW',desc:'Best RF fundamentals channel'}], companies:['Ericsson','Nokia','Vodafone','BT','GCHQ','Leonardo']},
+  vlsi:      { title:'VLSI & Semiconductor',   icon:'🔬', color:'var(--orange)', salary:'£45k–£120k', skills:['Verilog/VHDL','FPGA','CMOS design','Cadence/Synopsys','SPICE','Digital logic'], overview:"Designing chips — extremely specialised, highly paid, global talent shortage.", roadmap:[{t:'Master Digital Logic',d:'Boolean algebra, flip-flops, FSMs. Your Year 1 digital electronics.'},{t:'Learn Verilog',d:'HDL for hardware. Free: nandland.com + iverilog.'},{t:'Get an FPGA Board',d:'£30 Arty A7 or Basys 3. Implement a CPU from scratch.'},{t:'Study CMOS Fundamentals',d:"Razavi Design of Analog CMOS ICs — free online."}], resources:[{type:'Book',name:'Verilog HDL (Palnitkar)',desc:'Best Verilog textbook for beginners'},{type:'Course',name:'nandland.com',desc:'Free FPGA/Verilog tutorials'},{type:'Tool',name:'iverilog + GTKWave',desc:'Free Verilog simulation'}], companies:['ARM','Intel','TSMC','Imagination Technologies','Graphcore','Qualcomm']},
+  control:   { title:'Control Systems',        icon:'🎛️', color:'var(--red)',    salary:'£35k–£80k',  skills:['Control theory','MATLAB/Simulink','PID tuning','State space','ROS','Laplace'], overview:'Controlling machines, robots, aircraft, industrial processes. Core EEE underpinning aerospace.', roadmap:[{t:'Master Laplace Transforms',d:'Foundation of control theory. Your uni maths modules.'},{t:'Build a PID Controller',d:'Balance a robot arm or control temperature on Arduino.'},{t:'Learn MATLAB/Simulink',d:'Control Systems Toolbox — industry standard.'},{t:'Study Modern Control',d:'State space, LQR, Kalman filter. Brian Douglas YouTube.'}], resources:[{type:'YouTube',name:'Brian Douglas',desc:'Best control systems series — crystal clear'},{type:'Book',name:'Ogata Modern Control Engineering',desc:'Standard university textbook'},{type:'Tool',name:'MATLAB Control Toolbox',desc:'Free with Swansea license'}], companies:['Airbus','BAE Systems','Rolls-Royce','ABB','Boston Dynamics','SpaceX']},
+  photonics: { title:'Photonics & Optics',     icon:'💡', color:'var(--sky)',    salary:'£35k–£85k',  skills:['Photonics','Optics','COMSOL','Fibre optics','Laser systems','Python'], overview:'Lasers, fibre optics, LiDAR, quantum photonics. Growing with autonomous vehicles.', roadmap:[{t:'Study Electromagnetic Waves',d:"Maxwell equations, wave optics, polarisation. Your EM module."},{t:'Learn COMSOL',d:'Free student trial. Simulate optical waveguides.'},{t:'Fibre Optics Project',d:'Fibre optic kit £30. Measure attenuation and bending loss.'}], resources:[{type:'Book',name:'Saleh & Teich Photonics',desc:'The photonics textbook'},{type:'Tool',name:'COMSOL',desc:'Free student trial'}], companies:['II-VI','Coherent','Lumentum','Leonardo','Google Quantum AI']},
+  quant:     { title:'Quantitative Finance',   icon:'📊', color:'var(--gold)',   salary:'£60k–£200k+',skills:['Python','Statistics','Signal processing','C++','Stochastic calculus','Time series'], overview:'Signal processing + maths applied to finance. Highest paying adjacent career for EEE graduates.', roadmap:[{t:'Master Probability & Stats',d:'MIT 6.041. Your EEE signals background is a huge advantage.'},{t:'Python for Finance',d:'pandas, numpy, yfinance. Build a backtesting framework.'},{t:'Study Options Pricing',d:'Black-Scholes — you already have the maths from EEE.'},{t:'Project Euler + Leetcode',d:'Quant firms use competitive programming interviews. Daily practice.'},{t:'Target Spring Weeks',d:'Jane Street, Goldman, Citadel all run first-year programmes.'}], resources:[{type:'Book',name:'Options Futures & Derivatives (Hull)',desc:'The quant finance bible'},{type:'YouTube',name:'QuantPy',desc:'Python for quant finance'},{type:'Resource',name:'Kaggle Jane Street',desc:'Real trading data + ML challenge'}], companies:['Jane Street','Citadel','Two Sigma','Goldman Sachs','Man Group','Marshall Wace']}
+};
+
+// Render career grid
+const clEl = document.getElementById('career-list-container');
+if(clEl) {
+  clEl.innerHTML = Object.entries(careerData).map(([id,c]) => `
+    <div class="career-card" onclick="showCareerDetail('${id}')" style="border-top:2px solid ${c.color}">
+      <div class="career-card-icon">${c.icon}</div>
+      <div class="career-card-title" style="color:${c.color}">${c.title}</div>
+      <div class="career-card-desc">${c.overview.substring(0,88)}...</div>
+      <div style="margin-top:10px"><span style="font-family:var(--display);font-size:14px;color:${c.color}">${c.salary}</span></div>
+      <div style="margin-top:8px"><button class="btn btn-lime btn-sm">EXPLORE ►</button></div>
+    </div>`).join('');
+}
+
+// Career view toggle
+function setCareerView(mode, btn) {
+  document.querySelectorAll('#page-careers .mode-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('careers-grid-view').style.display = mode === 'grid' ? 'block' : 'none';
+  document.getElementById('careers-tree-view').style.display = mode === 'tree' ? 'block' : 'none';
+  if(mode === 'tree') setTimeout(renderCareerTree, 50);
+}
+
+// Career tree map
+function renderCareerTree() {
+  const svg = document.getElementById('career-tree-svg');
+  if(!svg) return;
+  const W = svg.getBoundingClientRect().width || 800;
+  const H = 500;
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+  svg.setAttribute('height', H);
+
+  const entries = Object.entries(careerData);
+  const centerX = W/2, centerY = H/2, radius = Math.min(W,H)*0.35;
+  let html = '<rect width="' + W + '" height="' + H + '" fill="#0e0e12"/>';
+
+  // Draw center node
+  html += '<circle cx="' + centerX + '" cy="' + centerY + '" r="45" fill="#0e0e12" stroke="#c8ff00" stroke-width="2"/>';
+  html += '<text x="' + centerX + '" y="' + (centerY-6) + '" text-anchor="middle" font-family="Bebas Neue,sans-serif" font-size="16" fill="#c8ff00">EEE</text>';
+  html += '<text x="' + centerX + '" y="' + (centerY+10) + '" text-anchor="middle" font-family="Bebas Neue,sans-serif" font-size="16" fill="#c8ff00">DEGREE</text>';
+
+  entries.forEach(([id, c], idx) => {
+    const angle = (idx / entries.length) * Math.PI * 2 - Math.PI/2;
+    const nx = centerX + Math.cos(angle) * radius;
+    const ny = centerY + Math.sin(angle) * radius;
+    const col = c.color.replace('var(--','').replace(')','');
+    const colorMap = {lime:'#c8ff00',teal:'#00e5cc',violet:'#8b5cf6',gold:'#fbbf24',green:'#00ff88',red:'#ff3366',orange:'#ff5500',sky:'#38bdf8'};
+    const hex = colorMap[col] || '#c8ff00';
+
+    // Line from center to node
+    html += '<line x1="' + centerX + '" y1="' + centerY + '" x2="' + nx + '" y2="' + ny + '" stroke="' + hex + '" stroke-width="1" stroke-opacity="0.3"/>';
+
+    // Node circle
+    html += '<circle cx="' + nx + '" cy="' + ny + '" r="36" fill="' + hex + '18" stroke="' + hex + '" stroke-width="1.5" style="cursor:pointer" data-career-id="' + id + '"/>';
+
+    // Icon
+    html += '<text x="' + nx + '" y="' + (ny-8) + '" text-anchor="middle" font-size="16">' + c.icon + '</text>';
+
+    // Salary badge
+    html += '<text x="' + nx + '" y="' + (ny+8) + '" text-anchor="middle" font-family="Space Mono,monospace" font-size="7" fill="' + hex + '">' + c.salary + '</text>';
+
+    // Label outside
+    const labelR = radius + 52;
+    const lx = centerX + Math.cos(angle) * labelR;
+    const ly = centerY + Math.sin(angle) * labelR;
+    const anchor = nx > centerX + 10 ? 'start' : nx < centerX - 10 ? 'end' : 'middle';
+    const words = c.title.split(' ');
+    words.forEach((w, wi) => {
+      html += '<text x="' + lx + '" y="' + (ly + wi*13 - (words.length-1)*6) + '" text-anchor="' + anchor + '" font-family="Bebas Neue,sans-serif" font-size="11" fill="' + hex + '">' + w + '</text>';
+    });
+  });
+
+  svg.innerHTML = html;
+  // Wire up tree node clicks via event delegation
+  svg.addEventListener('click', function(e) {
+    const node = e.target.closest('[data-career-id]');
+    if(node) {
+      const id = node.getAttribute('data-career-id');
+      showCareerDetail(id);
+      setCareerView('grid', document.querySelector('#page-careers .mode-btn'));
+    }
+  });
+}
+
+function showCareerDetail(id) {
+  const career = careerData[id];
+  if(!career) return;
+  document.getElementById('careers-grid-view').style.display = 'none';
+  document.getElementById('careers-tree-view').style.display = 'none';
+  const detail = document.getElementById('career-detail-view');
+  detail.classList.add('active');
+  document.getElementById('career-detail-title').textContent = career.icon + ' ' + career.title;
+  document.getElementById('career-detail-content').innerHTML = `
+    <div class="grid-2" style="margin-bottom:14px">
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Overview</span></div>
+        <div class="panel-body">
+          <p style="font-size:12px;color:var(--muted);line-height:1.8;margin-bottom:12px">${career.overview}</p>
+          <div style="font-size:9px;letter-spacing:0.15em;color:var(--muted2);text-transform:uppercase">UK Salary Range</div>
+          <div style="font-family:var(--display);font-size:20px;color:${career.color}">${career.salary}</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Key Skills</span></div>
+        <div class="panel-body">
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px">
+            ${career.skills.map(s => '<span class="tag tag-lime">' + s + '</span>').join('')}
+          </div>
+          <div style="font-size:9px;color:var(--muted2);text-transform:uppercase;margin-bottom:6px">Target Companies</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px">
+            ${career.companies.map(c => '<span class="tag tag-gold">' + c + '</span>').join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel" style="margin-bottom:14px">
+      <div class="panel-header">
+        <span class="panel-title">Roadmap — Step by Step</span>
+        <button class="btn btn-gold btn-sm" id="career-ai-btn">⚡ AI PERSONALISE THIS</button>
+      </div>
+      <div class="panel-body">
+        <div style="display:flex;flex-direction:column;gap:3px">
+          ${career.roadmap.map((s,i) =>
+            '<div class="roadmap-step" style="border-left-color:' + career.color + '">' +
+            '<div class="roadmap-step-num" style="color:' + career.color + '">' + (i+1) + '</div>' +
+            '<div><h4>' + s.t + '</h4><p>' + s.d + '</p></div></div>'
+          ).join('')}
+        </div>
+        <div class="ai-box" id="career-ai-advice" style="margin-top:12px;display:none"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Resources</span></div>
+      <div class="panel-body">
+        <div class="resource-grid">
+          ${career.resources.map(r =>
+            '<div class="resource-item">' +
+            '<div class="resource-item-type">' + r.type + '</div>' +
+            '<div class="resource-item-name">' + r.name + '</div>' +
+            '<div class="resource-item-desc">' + r.desc + '</div></div>'
+          ).join('')}
+        </div>
+      </div>
+    </div>`;
+  setTimeout(() => {
+    const btn = document.getElementById('career-ai-btn');
+    if(btn) btn.addEventListener('click', () => {
+      const el = document.getElementById('career-ai-advice');
+      el.style.display = 'block';
+      askAI('/api/ai/career-advice', { careerTitle: career.title }, el);
+    });
+  }, 0);
+}
+
+function backToCareers() {
+  document.getElementById('careers-grid-view').style.display = 'block';
+  document.getElementById('careers-tree-view').style.display = 'none';
+  const d = document.getElementById('career-detail-view');
+  d.classList.remove('active');
+  document.getElementById('career-detail-content').innerHTML = '';
+}
+
+// ── HUSTLE ───────────────────────────────────────────────────────
+const hustleEl = document.getElementById('hustle-active');
+if(hustleEl) {
+  hustleEl.innerHTML = [
+    {t:'EEE Tutoring',      d:'A-level Physics/Maths. £20–40/hr via Tutorful or Superprof. Zero startup cost.',     status:'EXPLORE',color:'var(--lime)'},
+    {t:'Sell Project Kits', d:'Document Month 1 project. Sell kit + guide on Etsy/Tindie. £15–25 per kit.',          status:'EXPLORE',color:'var(--lime)'},
+    {t:'Technical Content', d:'Document learning on X/YouTube Shorts. "EEE student builds X" format gets traction.', status:'PLAN',   color:'var(--gold)'},
+  ].map(h =>
+    '<div style="background:var(--s2);border:1px solid var(--border);padding:13px 15px;display:flex;justify-content:space-between;align-items:start;margin-bottom:6px">' +
+    '<div><div style="font-size:13px;font-weight:700;margin-bottom:3px">' + h.t + '</div>' +
+    '<div style="font-size:11px;color:var(--muted)">' + h.d + '</div></div>' +
+    '<span class="tag" style="border-color:' + h.color + ';color:' + h.color + '">' + h.status + '</span></div>'
+  ).join('');
+}
+
+async function generateHustleIdeas() {
+  const skills = document.getElementById('hustle-skill').value.trim();
+  const timeAvailable = document.getElementById('hustle-time').value.trim();
+  if(!skills) { showNotif('Enter your skills first'); return; }
+  await askAI('/api/ai/hustle-ideas', { skills, timeAvailable }, document.getElementById('hustle-ideas'));
+}
+
+async function analyseBusinessIdea() {
+  const idea = document.getElementById('business-idea-input').value.trim();
+  if(!idea) { showNotif('Describe your business idea first'); return; }
+  const el = document.getElementById('business-analysis');
+  el.style.display = 'block';
+  await askAI('/api/ai/business-analysis', { idea }, el);
+}
+
+// ── HABITS ───────────────────────────────────────────────────────
+const habitDefs = [
+  {name:'Sabaq',            color:'var(--gold)'},
+  {name:'Sabqi + Manzil',  color:'var(--gold)'},
+  {name:'Tilawah',          color:'var(--gold)'},
+  {name:'Anki Cards',       color:'var(--teal)'},
+  {name:'Uni Notes Review', color:'var(--teal)'},
+  {name:'Project Lab',      color:'var(--lime)'},
+  {name:'Curiosity Lab',    color:'var(--violet)'},
+  {name:'Gym Session',      color:'var(--orange)'},
+  {name:'Sport/Activity',   color:'var(--pink)'},
+];
+const habitDays = ['Sat','Sun','Mon','Tue','Wed','Thu','Fri'];
+let habitState = {};
+
+async function loadHabits() {
+  try {
+    const data = await api('GET', '/api/habits');
+    habitState = data.state || {};
+  } catch(e) {
+    habitState = JSON.parse(localStorage.getItem('malik-habits-v3') || '{}');
+  }
+  renderHabits();
+  updateStats();
+}
+
+function renderHabits() {
+  const c = document.getElementById('habits-container');
+  if(!c) return;
+  c.innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">' +
+    '<div style="min-width:170px"></div>' +
+    habitDays.map(d => '<div style="font-size:9px;color:var(--muted);letter-spacing:0.1em;width:20px;text-align:center">' + d + '</div>').join('') +
+    '<div style="margin-left:6px;font-size:9px;color:var(--muted2)">SCORE</div></div>' +
+    habitDefs.map((h, hi) => {
+      const done = habitDays.filter((_,di) => habitState[hi+'-'+di]).length;
+      return '<div class="habit-row">' +
+        '<div class="habit-name" style="color:' + h.color + '">' + h.name + '</div>' +
+        '<div class="habit-dots">' +
+        habitDays.map((_,di) => {
+          const isDone = !!habitState[hi+'-'+di];
+          return '<div class="hdot' + (isDone?' done':'') + '" style="' + (isDone?'background:'+h.color+';border-color:'+h.color+';':'') + '" onclick="toggleHabit(' + hi + ',' + di + ')"></div>';
+        }).join('') +
+        '</div><div class="habit-streak" style="color:' + h.color + '">' + done + '/7</div></div>';
+    }).join('');
+}
+
+async function toggleHabit(hi, di) {
+  const key = hi + '-' + di;
+  habitState[key] = !habitState[key];
+  renderHabits();
+  updateStats();
+  try {
+    await api('POST', '/api/habits/toggle', { habitIdx: hi, dayIdx: di, done: habitState[key] });
+  } catch(e) {
+    localStorage.setItem('malik-habits-v3', JSON.stringify(habitState));
+  }
+}
+
+async function resetHabits() {
+  try { await api('POST', '/api/habits/reset'); } catch(e) {}
+  habitState = {};
+  localStorage.setItem('malik-habits-v3', '{}');
+  renderHabits();
+  showNotif('Habits reset for new week');
+}
+
+loadHabits();
+
+// ══════════════════════════════════════════════════════════════════
+// SAVE AI SUGGESTIONS — Projects, Curiosity, Hustle
+// ══════════════════════════════════════════════════════════════════
+
+function saveAISuggestionAsIdea() {
+  const aiText = document.getElementById('idea-expand-result').innerText.trim();
+  const title = document.getElementById('idea-title').value.trim() || 'AI Suggestion ' + new Date().toLocaleDateString('en-GB');
+  if(!aiText || aiText.includes('Add a title first')) { showNotif('Generate an AI suggestion first'); return; }
+  ideas.unshift({ id: Date.now(), title, description: aiText.substring(0, 300), category: document.getElementById('idea-cat').value, priority: 'High', created_at: new Date().toISOString() });
+  localStorage.setItem('malik-ideas', JSON.stringify(ideas));
+  renderIdeas();
+  updateStats();
+  showNotif('AI suggestion saved as idea: ' + title);
+  // Show the save button after AI responds
+  const row = document.getElementById('idea-save-ai-row');
+  if(row) row.style.display = 'block';
+}
+
+// Show save button when AI expands idea
+const _origAiExpandIdea = window.aiExpandIdea;
+
+// Curiosity — save concept notes
+function saveConceptNote() {
+  const name = document.getElementById('concept-save-name').value.trim();
+  const text = document.getElementById('study-answer').innerText.trim();
+  const q = document.getElementById('study-q').value.trim();
+  const saveName = name || q || 'Concept ' + new Date().toLocaleDateString('en-GB');
+  if(!text || text.includes('Ask anything')) { showNotif('Generate an explanation first'); return; }
+  const concepts = JSON.parse(localStorage.getItem('malik-concepts') || '{}');
+  concepts[saveName] = { text, date: new Date().toLocaleDateString('en-GB'), level: document.getElementById('study-level').value };
+  localStorage.setItem('malik-concepts', JSON.stringify(concepts));
+  renderSavedConcepts();
+  document.getElementById('concept-save-name').value = '';
+  showNotif('Concept saved: ' + saveName);
+}
+
+function toggleSavedConcepts() {
+  const c = document.getElementById('saved-concepts-container');
+  if(!c) return;
+  const isHidden = c.style.display === 'none' || !c.style.display;
+  c.style.display = isHidden ? 'block' : 'none';
+  if(isHidden) renderSavedConcepts();
+}
+
+function renderSavedConcepts() {
+  const c = document.getElementById('saved-concepts-container');
+  if(!c) return;
+  const concepts = JSON.parse(localStorage.getItem('malik-concepts') || '{}');
+  const keys = Object.keys(concepts);
+  if(!keys.length) {
+    c.innerHTML = '<div style="color:var(--muted2);font-size:12px;text-align:center;padding:10px">No saved concepts yet</div>';
+    return;
+  }
+  c.innerHTML = keys.map((k, ki) => {
+    const cn = concepts[k];
+    return '<div style="border:1px solid var(--border);background:var(--s2);padding:12px;margin-bottom:8px">' +
+      '<div style="display:flex;justify-content:space-between;margin-bottom:6px">' +
+        '<strong style="color:var(--lime)">' + k + '</strong>' +
+        '<div style="display:flex;gap:6px;align-items:center">' +
+          '<span style="font-size:9px;color:var(--muted)">' + cn.date + ' · ' + cn.level + '</span>' +
+          '<button class="icon-btn concept-del-btn" data-key="' + ki + '">✕</button>' +
+        '</div>' +
+      '</div>' +
+      '<div style="font-size:11px;color:var(--muted);line-height:1.7;max-height:100px;overflow:hidden">' + cn.text.substring(0,300) + '...</div>' +
+      '<button class="btn btn-lime btn-sm concept-exp-btn" data-key="' + ki + '" style="margin-top:8px">READ FULL</button>' +
+    '</div>';
+  }).join('');
+
+  // Wire up buttons using data-key index
+  const allKeys = keys;
+  c.querySelectorAll('.concept-del-btn').forEach(btn => {
+    btn.addEventListener('click', () => deleteConcept(allKeys[parseInt(btn.dataset.key)]));
+  });
+  c.querySelectorAll('.concept-exp-btn').forEach(btn => {
+    btn.addEventListener('click', () => expandConcept(allKeys[parseInt(btn.dataset.key)]));
+  });
+}
+
+
+function expandConcept(name) {
+  const concepts = JSON.parse(localStorage.getItem('malik-concepts') || '{}');
+  const cn = concepts[name];
+  if(!cn) return;
+  document.getElementById('study-q').value = name;
+  document.getElementById('study-answer').innerHTML = cn.text.replace(/\n/g,'<br>');
+  document.getElementById('study-answer').className = 'ai-box';
+}
+
+function deleteConcept(name) {
+  const concepts = JSON.parse(localStorage.getItem('malik-concepts') || '{}');
+  delete concepts[name];
+  localStorage.setItem('malik-concepts', JSON.stringify(concepts));
+  renderSavedConcepts();
+  showNotif('Concept deleted');
+}
+
+// Hustle — save ideas
+function saveHustleIdeas() {
+  const text = document.getElementById('hustle-ideas').innerText.trim();
+  if(!text || text.includes('Enter your skills')) { showNotif('Generate ideas first'); return; }
+  const skills = document.getElementById('hustle-skill').value.trim();
+  const key = (skills || 'Session') + ' — ' + new Date().toLocaleDateString('en-GB');
+  const saved = JSON.parse(localStorage.getItem('malik-hustle-saved') || '{}');
+  saved[key] = { text, date: new Date().toLocaleDateString('en-GB') };
+  localStorage.setItem('malik-hustle-saved', JSON.stringify(saved));
+  renderSavedHustle();
+  showNotif('Hustle ideas saved');
+}
+
+function saveBusinessAnalysis() {
+  const text = document.getElementById('business-analysis').innerText.trim();
+  const idea = document.getElementById('business-idea-input').value.trim();
+  if(!text || !idea) { showNotif('Analyse a business idea first'); return; }
+  const key = idea.substring(0,40) + '... — ' + new Date().toLocaleDateString('en-GB');
+  const saved = JSON.parse(localStorage.getItem('malik-hustle-saved') || '{}');
+  saved[key] = { text, date: new Date().toLocaleDateString('en-GB') };
+  localStorage.setItem('malik-hustle-saved', JSON.stringify(saved));
+  renderSavedHustle();
+  showNotif('Business analysis saved');
+}
+
+function renderSavedHustle() {
+  const c = document.getElementById('saved-hustle-container');
+  if(!c) return;
+  const saved = JSON.parse(localStorage.getItem('malik-hustle-saved') || '{}');
+  const keys = Object.keys(saved).reverse();
+  if(!keys.length) {
+    c.innerHTML = '<div style="color:var(--muted2);font-size:12px;text-align:center;padding:10px">No saved ideas yet</div>';
+    return;
+  }
+  c.innerHTML = keys.map((k, ki) => {
+    const s = saved[k];
+    return '<div style="border:1px solid var(--border);background:var(--s2);padding:12px;margin-bottom:8px">' +
+      '<div style="display:flex;justify-content:space-between;margin-bottom:6px">' +
+        '<strong style="font-size:11px;color:var(--teal)">' + k + '</strong>' +
+        '<button class="icon-btn hustle-del-btn" data-key="' + ki + '">✕</button>' +
+      '</div>' +
+      '<div style="font-size:11px;color:var(--muted);line-height:1.7;max-height:80px;overflow:hidden">' + s.text.substring(0,250) + '...</div>' +
+    '</div>';
+  }).join('');
+
+  c.querySelectorAll('.hustle-del-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      deleteHustleSave(keys[parseInt(btn.dataset.key)]);
+    });
+  });
+}
+
+
+function deleteHustleSave(key) {
+  const saved = JSON.parse(localStorage.getItem('malik-hustle-saved') || '{}');
+  delete saved[key];
+  localStorage.setItem('malik-hustle-saved', JSON.stringify(saved));
+  renderSavedHustle();
+}
+
+// Init saved hustle on load
+renderSavedHustle();
+
+// ══════════════════════════════════════════════════════════════════
+// GYM PROGRESS CHART — SVG line graph (always uses local session data)
+// ══════════════════════════════════════════════════════════════════
+function populateChartExerciseSelect() {
+  const sel = document.getElementById('chart-exercise');
+  if(!sel) return;
+  const opts = ['<option value="">— Select exercise —</option>'];
+  Object.entries(gymDays).forEach(([d, day]) => {
+    day.ex.forEach((ex, i) => {
+      opts.push('<option value="' + d + '-' + i + '">D' + d + ': ' + ex[0] + '</option>');
+    });
+  });
+  sel.innerHTML = opts.join('');
+}
+
+function renderProgressChart() {
+  const sel = document.getElementById('chart-exercise');
+  const wrap = document.getElementById('gym-chart-wrap');
+  if(!sel || !wrap) return;
+  const val = sel.value;
+  if(!val) { wrap.innerHTML = '<div style="color:var(--muted2);font-size:12px;text-align:center;padding:30px">Select an exercise above</div>'; return; }
+
+  // Gather data from local session log
+  const sessions = JSON.parse(localStorage.getItem('malik-gym-sessions-local') || '[]');
+  const [dayNum, exIdx] = val.split('-');
+  const points = sessions
+    .filter(s => s.day == dayNum && s.weights && s.weights[val] !== undefined)
+    .map(s => ({ date: new Date(s.logged_at), weight: parseFloat(s.weights[val]) || 0 }))
+    .filter(p => p.weight > 0)
+    .sort((a,b) => a.date - b.date);
+
+  const exName = gymDays[parseInt(dayNum)]?.ex[parseInt(exIdx)]?.[0] || 'Exercise';
+
+  if(!points.length) {
+    wrap.innerHTML = '<div style="color:var(--muted2);font-size:12px;text-align:center;padding:30px">No weight data for <strong style="color:var(--lime)">' + exName + '</strong> yet.<br>Log a session with weights filled in to start tracking.</div>';
+    return;
+  }
+
+  drawLineChart(wrap, points, exName, '#c8ff00');
+}
+
+function drawLineChart(container, points, label, color) {
+  const W = container.getBoundingClientRect().width || 700;
+  const H = 280;
+  const pad = { t:30, r:20, b:50, l:55 };
+  const cW = W - pad.l - pad.r;
+  const cH = H - pad.t - pad.b;
+
+  const vals = points.map(p => p.weight);
+  const minV = Math.min(...vals) * 0.92;
+  const maxV = Math.max(...vals) * 1.08 || minV + 10;
+  const range = maxV - minV || 1;
+
+  const px = (i) => pad.l + (i / Math.max(points.length - 1, 1)) * cW;
+  const py = (v) => pad.t + cH - ((v - minV) / range) * cH;
+
+  let svg = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" style="font-family:Space Mono,monospace;display:block">';
+
+  // Background
+  svg += '<rect width="' + W + '" height="' + H + '" fill="#0e0e12" rx="4"/>';
+
+  // Grid lines & Y labels
+  const ySteps = 5;
+  for(let i=0;i<=ySteps;i++) {
+    const v = minV + (range * i/ySteps);
+    const y = py(v);
+    svg += '<line x1="' + pad.l + '" y1="' + y + '" x2="' + (W-pad.r) + '" y2="' + y + '" stroke="#1e1e26" stroke-width="1"/>';
+    svg += '<text x="' + (pad.l-6) + '" y="' + (y+4) + '" text-anchor="end" font-size="9" fill="#5a5a72">' + v.toFixed(1) + 'kg</text>';
+  }
+
+  // Area fill under line
+  if(points.length > 1) {
+    let areaPath = 'M ' + px(0) + ' ' + py(points[0].weight);
+    points.forEach((p,i) => { if(i>0) areaPath += ' L ' + px(i) + ' ' + py(p.weight); });
+    areaPath += ' L ' + px(points.length-1) + ' ' + (pad.t+cH) + ' L ' + pad.l + ' ' + (pad.t+cH) + ' Z';
+    svg += '<path d="' + areaPath + '" fill="' + color + '" fill-opacity="0.07"/>';
+  }
+
+  // Line
+  if(points.length > 1) {
+    let linePath = 'M ' + px(0) + ' ' + py(points[0].weight);
+    points.forEach((p,i) => { if(i>0) linePath += ' L ' + px(i) + ' ' + py(p.weight); });
+    svg += '<path d="' + linePath + '" fill="none" stroke="' + color + '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+  }
+
+  // Dots + X labels + value tooltips
+  points.forEach((p, i) => {
+    const x = px(i), y = py(p.weight);
+    const dateStr = p.date.toLocaleDateString('en-GB', {day:'numeric',month:'short'});
+    // X label
+    svg += '<text x="' + x + '" y="' + (H-8) + '" text-anchor="middle" font-size="8" fill="#5a5a72">' + dateStr + '</text>';
+    // Value above dot
+    svg += '<text x="' + x + '" y="' + (y-10) + '" text-anchor="middle" font-size="9" fill="' + color + '" font-weight="700">' + p.weight + 'kg</text>';
+    // Outer glow ring
+    svg += '<circle cx="' + x + '" cy="' + y + '" r="7" fill="#0e0e12" stroke="' + color + '" stroke-width="1" stroke-opacity="0.3"/>';
+    // Dot
+    svg += '<circle cx="' + x + '" cy="' + y + '" r="4" fill="' + color + '"/>';
+  });
+
+  // Title
+  svg += '<text x="' + (W/2) + '" y="18" text-anchor="middle" font-size="10" fill="' + color + '" font-weight="700" letter-spacing="1">' + label.toUpperCase() + '</text>';
+
+  svg += '</svg>';
+  container.innerHTML = svg;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// HABITS — LOG WEEK + LINE CHART
+// ══════════════════════════════════════════════════════════════════
+function updateHabitsTitle() {
+  const el = document.getElementById('habits-week-title');
+  if(!el) return;
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 6 ? 0 : (day + 1);
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - diff);
+  el.textContent = 'Daily Habits — Week of ' + weekStart.toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'});
+}
+updateHabitsTitle();
+
+const habitNames = ['Sabaq','Sabqi+Manzil','Tilawah','Anki','Uni Notes','Project Lab','Curiosity Lab','Gym','Sport'];
+
+function logWeek() {
+  const total = Object.values(habitState).filter(Boolean).length;
+  const maxPossible = 9 * 7;
+  const pct = Math.round((total / maxPossible) * 100);
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 6 ? 0 : (day + 1);
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - diff);
+  const weekLabel = weekStart.toLocaleDateString('en-GB', {day:'numeric',month:'short'});
+  const weekISO = weekStart.toISOString().split('T')[0];
+
+  // Per-habit daily means (days done / 7)
+  const breakdown = {};
+  habitNames.forEach((name, hi) => {
+    const done = [0,1,2,3,4,5,6].filter(di => habitState[hi+'-'+di]).length;
+    breakdown[name] = done;
+  });
+
+  const log = JSON.parse(localStorage.getItem('malik-habits-log') || '[]');
+  const existing = log.findIndex(w => w.weekISO === weekISO);
+  const entry = { week: weekLabel, weekISO, score: total, pct, breakdown, logged: new Date().toISOString() };
+  if(existing >= 0) log[existing] = entry;
+  else log.unshift(entry);
+  localStorage.setItem('malik-habits-log', JSON.stringify(log.slice(0,20)));
+
+  renderHabitsLog();
+  renderHabitChart();
+  populateHabitChartSelect();
+  showNotif('Week logged: ' + total + '/' + maxPossible + ' (' + pct + '%)');
+}
+
+function renderHabitsLog() {
+  const c = document.getElementById('habits-log-container');
+  if(!c) return;
+  const log = JSON.parse(localStorage.getItem('malik-habits-log') || '[]');
+  if(!log.length) { c.innerHTML = ''; return; }
+  c.innerHTML = '<div style="font-size:9px;letter-spacing:0.2em;color:var(--muted);text-transform:uppercase;margin-bottom:10px;padding-top:14px;border-top:1px solid var(--border)">WEEKLY LOG HISTORY</div>' +
+    log.map(w => {
+      const col = w.pct >= 80 ? 'var(--lime)' : w.pct >= 60 ? 'var(--gold)' : 'var(--orange)';
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">' +
+        '<div style="font-size:12px;font-weight:700">' + w.week + '</div>' +
+        '<div style="display:flex;gap:16px;align-items:center">' +
+          '<div style="font-size:11px;color:var(--muted)">' + w.score + '/63</div>' +
+          '<div style="font-family:var(--display);font-size:20px;color:' + col + '">' + w.pct + '%</div>' +
+        '</div></div>';
+    }).join('');
+}
+
+function populateHabitChartSelect() {
+  const sel = document.getElementById('habit-chart-select');
+  if(!sel) return;
+  sel.innerHTML = '<option value="all">All Habits (Mean %)</option>' +
+    habitNames.map((n,i) => '<option value="' + i + '">' + n + '</option>').join('');
+}
+
+function renderHabitChart() {
+  const wrap = document.getElementById('habit-chart-wrap');
+  const sel = document.getElementById('habit-chart-select');
+  if(!wrap) return;
+
+  const log = JSON.parse(localStorage.getItem('malik-habits-log') || '[]').slice().reverse(); // oldest first
+  if(!log.length) {
+    wrap.innerHTML = '<div style="color:var(--muted2);font-size:12px;text-align:center;padding:30px">Log weeks to see your habit performance trend</div>';
+    return;
+  }
+
+  const mode = sel ? sel.value : 'all';
+
+  let points;
+  if(mode === 'all') {
+    // Mean % across all habits per week
+    points = log.map(w => ({ date: new Date(w.weekISO || Date.now()), weight: w.pct, label: w.week }));
+  } else {
+    // Specific habit — days done / 7 * 100
+    const hi = parseInt(mode);
+    points = log.map(w => {
+      const done = w.breakdown ? (w.breakdown[habitNames[hi]] || 0) : 0;
+      return { date: new Date(w.weekISO || Date.now()), weight: Math.round((done/7)*100), label: w.week };
+    });
+  }
+
+  // Use drawLineChart but with % labels
+  drawHabitLineChart(wrap, points, mode === 'all' ? 'Overall Habit Score' : habitNames[parseInt(mode)]);
+}
+
+function drawHabitLineChart(container, points, label) {
+  const W = container.getBoundingClientRect().width || 700;
+  const H = 280;
+  const pad = { t:30, r:20, b:50, l:50 };
+  const cW = W - pad.l - pad.r;
+  const cH = H - pad.t - pad.b;
+  const color = '#c8ff00';
+
+  const vals = points.map(p => p.weight);
+  const minV = 0;
+  const maxV = 100;
+  const range = 100;
+
+  const px = (i) => pad.l + (i / Math.max(points.length-1,1)) * cW;
+  const py = (v) => pad.t + cH - (v/range)*cH;
+
+  let svg = '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" style="font-family:Space Mono,monospace;display:block">';
+  svg += '<rect width="'+W+'" height="'+H+'" fill="#0e0e12" rx="4"/>';
+
+  // Grid lines
+  [0,25,50,75,100].forEach(v => {
+    const y = py(v);
+    const gridCol = v === 0 ? '#2a2a36' : '#1e1e26';
+    svg += '<line x1="'+pad.l+'" y1="'+y+'" x2="'+(W-pad.r)+'" y2="'+y+'" stroke="'+gridCol+'" stroke-width="'+(v===0?1.5:1)+'"/>';
+    svg += '<text x="'+(pad.l-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="9" fill="#5a5a72">'+v+'%</text>';
+  });
+
+  // Colour zones
+  svg += '<rect x="'+pad.l+'" y="'+py(80)+'" width="'+cW+'" height="'+(py(0)-py(80))+'" fill="#c8ff00" fill-opacity="0.03"/>';
+  svg += '<rect x="'+pad.l+'" y="'+py(60)+'" width="'+cW+'" height="'+(py(80)-py(60))+'" fill="#fbbf24" fill-opacity="0.03"/>';
+  svg += '<rect x="'+pad.l+'" y="'+py(0)+'" width="'+cW+'" height="'+(py(60)-py(0))+'" fill="#ff5500" fill-opacity="0.03"/>';
+
+  if(points.length > 1) {
+    // Area
+    let area = 'M '+px(0)+' '+py(points[0].weight);
+    points.forEach((p,i) => { if(i>0) area += ' L '+px(i)+' '+py(p.weight); });
+    area += ' L '+px(points.length-1)+' '+py(0)+' L '+px(0)+' '+py(0)+' Z';
+    svg += '<path d="'+area+'" fill="'+color+'" fill-opacity="0.08"/>';
+    // Line
+    let line = 'M '+px(0)+' '+py(points[0].weight);
+    points.forEach((p,i) => { if(i>0) line += ' L '+px(i)+' '+py(p.weight); });
+    svg += '<path d="'+line+'" fill="none" stroke="'+color+'" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+  }
+
+  points.forEach((p,i) => {
+    const x=px(i), y=py(p.weight);
+    const col = p.weight>=80?'#c8ff00':p.weight>=60?'#fbbf24':'#ff5500';
+    svg += '<text x="'+x+'" y="'+(H-8)+'" text-anchor="middle" font-size="8" fill="#5a5a72">'+p.label+'</text>';
+    svg += '<text x="'+x+'" y="'+(y-10)+'" text-anchor="middle" font-size="9" fill="'+col+'" font-weight="700">'+p.weight+'%</text>';
+    svg += '<circle cx="'+x+'" cy="'+y+'" r="6" fill="#0e0e12" stroke="'+col+'" stroke-width="1.5"/>';
+    svg += '<circle cx="'+x+'" cy="'+y+'" r="3.5" fill="'+col+'"/>';
+  });
+
+  svg += '<text x="'+(W/2)+'" y="18" text-anchor="middle" font-size="10" fill="'+color+'" font-weight="700" letter-spacing="1">'+label.toUpperCase()+'</text>';
+  svg += '</svg>';
+  container.innerHTML = svg;
+}
+
+// ── patch logGymSession to save locally for chart ─────────────────
+const _origLogGym = logGymSession;
+async function logGymSession() {
+  // Save weights snapshot locally for chart (backend may not have this data)
+  const localSessions = JSON.parse(localStorage.getItem('malik-gym-sessions-local') || '[]');
+  const snap = {};
+  gymDays[curGymDay].ex.forEach((_,i) => {
+    const key = curGymDay + '-' + i;
+    if(gymWeights[key]) snap[key] = gymWeights[key];
+  });
+  localSessions.unshift({ day: curGymDay, weights: snap, logged_at: new Date().toISOString() });
+  localStorage.setItem('malik-gym-sessions-local', JSON.stringify(localSessions.slice(0,50)));
+  // Call original
+  await _origLogGym();
+  // Refresh chart if visible
+  const sel = document.getElementById('chart-exercise');
+  if(sel && sel.value) renderProgressChart();
+}
+
+// Clear habit graph data
+function clearHabitGraph() {
+  if(!confirm('Clear all logged week data from the graph? This cannot be undone.')) return;
+  localStorage.removeItem('malik-habits-log');
+  renderHabitsLog();
+  renderHabitChart();
+  showNotif('Habit graph cleared');
+}
+
+// Init on page load
+populateHabitChartSelect();
+renderHabitsLog();
+setTimeout(() => { renderHabitChart(); }, 200);
+
+
+// ── STATS ────────────────────────────────────────────────────────
+function updateStats() {
+  const ideasEl = document.getElementById('home-ideas');
+  const streakEl = document.getElementById('home-streak');
+  const projEl = document.getElementById('home-projects');
+  if(ideasEl)  ideasEl.textContent  = ideas.length;
+  if(streakEl) streakEl.textContent = Object.values(habitState).filter(Boolean).length;
+  if(projEl)   projEl.textContent   = 1 + ideas.filter(i => (i.category||'').match(/EEE|AI/i)).length;
+}
+updateStats();
+</script>
+</body>
+</html>
