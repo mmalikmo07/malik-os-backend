@@ -298,6 +298,7 @@ app.post('/api/ai/explain', async (req, res) => {
       `Use proper markdown formatting: # for main title, ## for section headers, ### for subsections, ` +
       `**bold** for key terms, *italic* for emphasis, - for bullet points, and > for important notes. ` +
       `For ALL equations and mathematical expressions, use LaTeX notation: $...$ for inline math and $$...$$ for display math. ` +
+      `NEVER draw ASCII art diagrams or circuit schematics — they render poorly. Instead, describe circuit topologies and connections in words. ` +
       `Never write equations as plain text. Structure the explanation with clear sections.`;
     const text = await callClaude(prompt, 1200, MALIK_SYSTEM);
     res.json({ text });
@@ -390,13 +391,27 @@ app.post('/api/ai/simulate', async (req, res) => {
       `  draw();\n` +
       `};\n` +
       `</script></body></html>\n\n` +
-      `YOUR simulation for "${simulation}" must follow the EXACT same pattern but be specific to the concept. Include:\n` +
-      `- Multiple visual elements (waveforms, phasors, circuits, diagrams — whatever fits)\n` +
-      `- At least 3-4 sliders that VISIBLY change the simulation in real time\n` +
-      `- Value readouts next to each slider\n` +
-      `- Animated elements using performance.now()\n` +
-      `- Grid lines and legends\n` +
-      `- Educational labels explaining what is happening\n\n` +
+      `YOUR simulation for "${simulation}" must follow the EXACT same pattern but be specific to the concept.\n\n` +
+      `LAYOUT RULES (CRITICAL):\n` +
+      `- Use SEPARATE canvases for different visual sections (e.g. one for waveforms, one for phasors, one for diagrams).\n` +
+      `- Stack canvases VERTICALLY — never overlap different visualisations on the same canvas.\n` +
+      `- Each canvas must have a minimum height of 300px.\n` +
+      `- Add clear section headers (styled divs) above each canvas: e.g. "Waveform Plot", "Phasor Diagram".\n` +
+      `- Leave padding/margins between sections.\n\n` +
+      `PHASOR + WAVEFORM SYNC RULES:\n` +
+      `- If you show both a phasor diagram and waveforms, they MUST share the same time variable t = performance.now() * 0.001.\n` +
+      `- The phasor angle = 2*PI*freq*t + phaseOffset. The dot on the waveform at the current time vertical line must be at the SAME angle.\n` +
+      `- Draw a moving vertical time cursor on the waveform canvas. The dot where the cursor crosses each wave = the tip of the corresponding phasor projected onto the Y axis.\n\n` +
+      `CIRCUIT DIAGRAM RULES:\n` +
+      `- Do NOT attempt to draw detailed circuit schematics with Canvas — they always look bad.\n` +
+      `- Instead, draw SIMPLIFIED BLOCK DIAGRAMS: labeled rectangles for components ("R1 = 10kΩ", "Op-Amp"), arrows for signal flow, simple triangles for op-amps.\n` +
+      `- For op-amps: draw a simple filled triangle pointing right with + and - labels at inputs, and label Vin, Vout, Rf, Rin as text.\n` +
+      `- Focus simulation effort on the WAVEFORMS and TRANSFER FUNCTIONS — that is what the user wants to see.\n\n` +
+      `INTERACTIVITY RULES:\n` +
+      `- At least 3-4 sliders that VISIBLY affect the simulation in real time.\n` +
+      `- Value readouts next to each slider that update live.\n` +
+      `- All waveforms must animate smoothly using performance.now().\n` +
+      `- Grid lines, axis labels, and a color-coded legend for every plotted line.\n\n` +
       `Return ONLY the HTML. No explanation. No markdown fences.`;
     const text = await callClaude(prompt, 4096, MALIK_SYSTEM);
     let code = text.trim();
