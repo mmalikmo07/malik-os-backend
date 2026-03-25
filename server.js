@@ -322,55 +322,82 @@ app.post('/api/ai/sim-suggest', async (req, res) => {
   }
 });
 
-// Simulation code generation — uses p5.js for reliable interactive simulations
+// Simulation code generation — raw Canvas (no CDN needed for sandboxed iframe)
 app.post('/api/ai/simulate', async (req, res) => {
   try {
     const { concept, simulation } = req.body;
     const prompt =
-      `Generate a COMPLETE working HTML page using p5.js that creates an interactive simulation of "${simulation}" for the concept "${concept}".\n\n` +
-      `You MUST use p5.js loaded from CDN: <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>\n\n` +
-      `REQUIREMENTS:\n` +
-      `1. Use p5.js global mode with setup() and draw() functions.\n` +
-      `2. In setup(): createCanvas(containerWidth, 500), set background.\n` +
-      `3. In draw(): this runs automatically 60 times per second — draw your simulation here.\n` +
-      `4. Use frameCount for time-based animation (e.g. let t = frameCount * 0.02 for smooth time).\n` +
-      `5. Create sliders with createSlider(min, max, default, step) — read their .value() in draw().\n` +
-      `6. For waveforms: loop x from 0 to width, compute y, use vertex() inside beginShape()/endShape().\n` +
-      `7. Use stroke(), fill(), line(), ellipse(), arc(), text() etc.\n` +
-      `8. Color scheme: background(10, 10, 14), use color(200,255,0) for lime, color(0,229,204) for teal, color(255,51,102) for red, color(251,191,36) for gold.\n` +
-      `9. CRITICAL: All slider values MUST be read INSIDE draw() so changes take effect IMMEDIATELY. Example: let amp = ampSlider.value();\n` +
-      `10. Put all p5.js code in a <script> tag AFTER the p5.js CDN script.\n\n` +
-      `EXAMPLE of a WORKING 3-phase waveform simulation:\n` +
-      `<html><head>\n` +
-      `<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>\n` +
-      `<style>body{margin:0;background:#0a0a0e;color:#e8e8f0;font-family:monospace;overflow:hidden}</style>\n` +
-      `</head><body>\n` +
-      `<script>\n` +
-      `let freqSlider, ampSlider;\n` +
-      `function setup() {\n` +
-      `  createCanvas(windowWidth, 500);\n` +
-      `  freqSlider = createSlider(1, 10, 3, 0.1);\n` +
-      `  ampSlider = createSlider(10, 200, 100, 1);\n` +
-      `}\n` +
-      `function draw() {\n` +
-      `  background(10, 10, 14);\n` +
-      `  let freq = freqSlider.value();\n` +
-      `  let amp = ampSlider.value();\n` +
-      `  let t = frameCount * 0.03;\n` +
-      `  stroke(200, 255, 0);\n` +
-      `  noFill();\n` +
-      `  beginShape();\n` +
-      `  for (let x = 0; x < width; x++) {\n` +
-      `    let y = height/2 + amp * sin(TWO_PI * freq * x/width + t);\n` +
-      `    vertex(x, y);\n` +
+      `Generate a COMPLETE, WORKING, standalone HTML page that interactively simulates "${simulation}" for "${concept}".\n\n` +
+      `ABSOLUTE RULES — if you break ANY of these, the simulation will not work:\n\n` +
+      `RULE 1: NO external scripts or CDN links. Everything must be inline.\n` +
+      `RULE 2: ALL JavaScript goes inside: window.onload = function() { ... };\n` +
+      `RULE 3: Set canvas dimensions in JS: canvas.width = 800; canvas.height = 400;\n` +
+      `RULE 4: Use a continuous animation loop with requestAnimationFrame.\n` +
+      `RULE 5 (MOST IMPORTANT): Read slider values EVERY FRAME inside the draw function using .value or .valueAsNumber. Do NOT rely on event listeners for reactivity. Example:\n` +
+      `  function draw() {\n` +
+      `    var freq = document.getElementById('freq').valueAsNumber;\n` +
+      `    var amp = document.getElementById('amp').valueAsNumber;\n` +
+      `    // use freq and amp to draw\n` +
       `  }\n` +
-      `  endShape();\n` +
-      `}\n` +
-      `function windowResized() { resizeCanvas(windowWidth, 500); }\n` +
+      `RULE 6: Animate using time: var t = performance.now() * 0.001; This gives smooth real-time animation.\n` +
+      `RULE 7: Always call ctx.clearRect(0, 0, w, h) at the start of each frame.\n` +
+      `RULE 8: Draw grid lines, axis labels, legends, and value readouts.\n\n` +
+      `Here is a COMPLETE WORKING example of a 3-phase voltage waveform sim:\n\n` +
+      `<!DOCTYPE html><html><head><style>\n` +
+      `*{margin:0;box-sizing:border-box} body{background:#0a0a0e;color:#e8e8f0;font-family:monospace;padding:10px}\n` +
+      `canvas{display:block;background:#0a0a0e;border:1px solid #1a1a2e;margin:10px auto}\n` +
+      `.ctrl{display:flex;gap:20px;justify-content:center;padding:10px;flex-wrap:wrap}\n` +
+      `.ctrl label{font-size:12px;color:#aaa}\n` +
+      `.ctrl input[type=range]{width:150px;accent-color:#00e5cc}\n` +
+      `.val{color:#c8ff00;font-size:12px}\n` +
+      `</style></head><body>\n` +
+      `<div class="ctrl">\n` +
+      `  <label>Frequency <input type="range" id="freq" min="0.5" max="5" step="0.1" value="1"><span class="val" id="fv">1 Hz</span></label>\n` +
+      `  <label>Amplitude <input type="range" id="amp" min="20" max="150" step="1" value="100"><span class="val" id="av">100 V</span></label>\n` +
+      `</div>\n` +
+      `<canvas id="c"></canvas>\n` +
+      `<script>\n` +
+      `window.onload = function() {\n` +
+      `  var c = document.getElementById("c"), ctx = c.getContext("2d");\n` +
+      `  c.width = Math.min(800, window.innerWidth - 30); c.height = 400;\n` +
+      `  var colors = ["#c8ff00", "#00e5cc", "#ff3366"];\n` +
+      `  var names = ["Phase A (0°)", "Phase B (120°)", "Phase C (240°)"];\n` +
+      `  function draw() {\n` +
+      `    var f = document.getElementById("freq").valueAsNumber;\n` +
+      `    var a = document.getElementById("amp").valueAsNumber;\n` +
+      `    document.getElementById("fv").textContent = f.toFixed(1) + " Hz";\n` +
+      `    document.getElementById("av").textContent = a + " V";\n` +
+      `    var t = performance.now() * 0.001;\n` +
+      `    var w = c.width, h = c.height, cy = h / 2;\n` +
+      `    ctx.clearRect(0, 0, w, h);\n` +
+      `    ctx.strokeStyle = "#1a1a2e"; ctx.lineWidth = 1;\n` +
+      `    for (var gy = 0; gy < h; gy += 40) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke(); }\n` +
+      `    for (var gx = 0; gx < w; gx += 40) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, h); ctx.stroke(); }\n` +
+      `    ctx.strokeStyle = "#333"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(w, cy); ctx.stroke();\n` +
+      `    for (var p = 0; p < 3; p++) {\n` +
+      `      ctx.strokeStyle = colors[p]; ctx.lineWidth = 2; ctx.beginPath();\n` +
+      `      for (var x = 0; x < w; x++) {\n` +
+      `        var phase = p * 2 * Math.PI / 3;\n` +
+      `        var y = cy + a * Math.sin(2 * Math.PI * f * (x / w) * 2 - t * 2 * Math.PI * f + phase);\n` +
+      `        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);\n` +
+      `      }\n` +
+      `      ctx.stroke();\n` +
+      `    }\n` +
+      `    ctx.font = "12px monospace";\n` +
+      `    for (var i = 0; i < 3; i++) { ctx.fillStyle = colors[i]; ctx.fillText(names[i], 10, 20 + i * 16); }\n` +
+      `    requestAnimationFrame(draw);\n` +
+      `  }\n` +
+      `  draw();\n` +
+      `};\n` +
       `</script></body></html>\n\n` +
-      `Your simulation should be MUCH more sophisticated than this example — include multiple visual elements, labels, grids, legends, and proper physics/maths.\n` +
-      `Style the sliders and labels nicely with CSS.\n` +
-      `Return ONLY the HTML code. No markdown fences. No explanations outside the code.`;
+      `YOUR simulation for "${simulation}" must follow the EXACT same pattern but be specific to the concept. Include:\n` +
+      `- Multiple visual elements (waveforms, phasors, circuits, diagrams — whatever fits)\n` +
+      `- At least 3-4 sliders that VISIBLY change the simulation in real time\n` +
+      `- Value readouts next to each slider\n` +
+      `- Animated elements using performance.now()\n` +
+      `- Grid lines and legends\n` +
+      `- Educational labels explaining what is happening\n\n` +
+      `Return ONLY the HTML. No explanation. No markdown fences.`;
     const text = await callClaude(prompt, 4096, MALIK_SYSTEM);
     let code = text.trim();
     const fence = '`'.repeat(3);
