@@ -500,6 +500,13 @@ app.post('/api/gym/sessions', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+app.delete('/api/gym/sessions/:id', async (req, res) => {
+  try {
+    await db.query('DELETE FROM gym_sessions WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // Gym progress data for chart
 app.get('/api/gym/progress/:dayNum/:exerciseIdx', async (req, res) => {
   try {
